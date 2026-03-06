@@ -1,13 +1,21 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Sidebar } from '@/components/shared/Sidebar';
-
+import { AppSidebar } from '@/components/shared/Sidebar';
+import { ThemeProvider } from '@/components/theme-provider';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 export const metadata: Metadata = {
   title: 'ZenTrade — 认知交易系统',
   description: '通过数据透明化与决策逻辑化，利用 AI 辅助阻断情绪干扰的个人资产管理工具。',
 };
-
-import { ThemeProvider } from '@/components/theme-provider';
 
 export default function RootLayout({
   children,
@@ -23,10 +31,29 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Sidebar />
-          <main className="ml-[240px] min-h-screen">
-            {children}
-          </main>
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+              <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+                <SidebarTrigger className="-ml-1" />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem className="hidden md:block">
+                      <BreadcrumbLink href="#">ZenTrade</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator className="hidden md:block" />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>Thesis Tracker</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </header>
+              <main className="flex-1 overflow-auto bg-background p-4 sm:p-6 md:p-8">
+                {children}
+              </main>
+            </SidebarInset>
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>
