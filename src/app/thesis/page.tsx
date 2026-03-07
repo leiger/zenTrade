@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useThesisStore } from '@/lib/store';
-import { ThesisCard } from '@/components/modules/thesis-tracker/ThesisCard';
+import { ThesisTable } from '@/components/modules/thesis-tracker/ThesisTable';
 import { ThesisForm } from '@/components/modules/thesis-tracker/ThesisForm';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ export default function ThesisPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       {/* 页头 */}
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-1">
@@ -54,7 +55,7 @@ export default function ThesisPage() {
 
       {/* 统计栏 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="rounded-xl border bg-gradient-to-t from-primary/5 to-card p-6 shadow-sm">
           <div className="flex flex-row items-center justify-between pb-2">
             <p className="text-sm font-medium text-muted-foreground">活跃看法</p>
             <Activity className="h-4 w-4 text-muted-foreground" />
@@ -64,7 +65,7 @@ export default function ThesisPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="rounded-xl border bg-gradient-to-t from-primary/5 to-card p-6 shadow-sm">
           <div className="flex flex-row items-center justify-between pb-2">
             <p className="text-sm font-medium text-muted-foreground">总快照数</p>
             <Camera className="h-4 w-4 text-muted-foreground" />
@@ -76,7 +77,7 @@ export default function ThesisPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="rounded-xl border bg-gradient-to-t from-primary/5 to-card p-6 shadow-sm">
           <div className="flex flex-row items-center justify-between pb-2">
             <p className="text-sm font-medium text-muted-foreground">待回顾</p>
             <Clock className="h-4 w-4 text-amber-500" />
@@ -94,6 +95,8 @@ export default function ThesisPage() {
         </div>
       </div>
 
+      <Separator className="my-8 opacity-50" />
+
       {/* 看法列表 */}
       {theses.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -102,7 +105,7 @@ export default function ThesisPage() {
           </div>
           <h3 className="text-lg font-medium mb-1">还没有看法记录</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            创建你的第一个投资看法，开始追踪你的认知和决策逻辑
+            创建你的第一个 investment 看法，开始追踪你的认知和决策逻辑
           </p>
           <Button onClick={() => setDialogOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -110,15 +113,7 @@ export default function ThesisPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {theses.map((thesis) => (
-            <ThesisCard
-              key={thesis.id}
-              thesis={thesis}
-              onClick={() => router.push(`/thesis/${thesis.id}`)}
-            />
-          ))}
-        </div>
+        <ThesisTable />
       )}
     </div>
   );

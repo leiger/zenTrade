@@ -52,7 +52,7 @@ export default function ThesisDetailPage() {
   };
 
   return (
-    <div className="p-2 md:p-4 max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       {/* 返回 & 操作 */}
       <div className="flex items-center justify-between mb-6">
         <Button

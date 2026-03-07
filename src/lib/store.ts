@@ -96,6 +96,7 @@ interface ThesisStore {
     thesisId: string,
     snapshot: Omit<Snapshot, 'id' | 'thesisId' | 'createdAt'>
   ) => void;
+  reorderTheses: (theses: Thesis[]) => void;
 }
 
 export const useThesisStore = create<ThesisStore>((set) => ({
@@ -147,4 +148,5 @@ export const useThesisStore = create<ThesisStore>((set) => ({
           : t
       ),
     })),
+  reorderTheses: (theses) => set({ theses }),
 }));
