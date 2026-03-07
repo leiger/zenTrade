@@ -4,9 +4,10 @@ import { Thesis } from '@/types/thesis';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getCategoryConfig } from '@/constants/assets';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { MessageSquareText, Clock, Layers } from 'lucide-react';
+import { MessageSquareText, Clock } from 'lucide-react';
 
 interface ThesisCardProps {
   thesis: Thesis;
@@ -14,6 +15,7 @@ interface ThesisCardProps {
 }
 
 export function ThesisCard({ thesis, onClick }: ThesisCardProps) {
+  const catConfig = getCategoryConfig(thesis.category);
   return (
     <Card
       className={cn(
@@ -28,19 +30,23 @@ export function ThesisCard({ thesis, onClick }: ThesisCardProps) {
           <div className="space-y-1 flex-1 min-w-0">
             <CardTitle className="text-base font-semibold truncate">{thesis.name}</CardTitle>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">
-                <Layers className="h-2.5 w-2.5 mr-0.5" />
-                {thesis.zone}
+              <Badge variant="secondary" className="text-[10px] font-mono font-normal px-1.5 py-0">
+                {thesis.asset}
               </Badge>
+              <span className="text-[10px] text-muted-foreground">
+                {catConfig?.icon} {catConfig?.label}
+              </span>
             </div>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-          {thesis.description}
-        </p>
+        {thesis.description && (
+          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+            {thesis.description}
+          </p>
+        )}
 
         {/* 标签 */}
         {thesis.tags.length > 0 && (

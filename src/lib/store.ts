@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Thesis, Snapshot, ThesisTag } from '@/types/thesis';
+import { Thesis, Snapshot, ThesisTag, FollowUp, Verdict } from '@/types/thesis';
 import { BUY_TAGS, SELL_TAGS } from '@/constants/tags';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import type { TimelineOption } from '@/types/thesis';
@@ -30,21 +30,30 @@ const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 const SEED_THESES: Thesis[] = [
   {
     id: 'seed-1',
-    name: 'BTC 长线持仓',
-    description:
-      '比特币作为数字黄金的长期价值投资。目标持有至下一轮减半周期后的新高。核心仓位不动摇，只在极端恐慌时加仓。',
-    zone: 'BTC 长线',
-    tags: [BUY_TAGS[0], BUY_TAGS[2]], // 基本面驱动, 定投计划执行
+    name: 'Bitcoin',
+    category: 'crypto',
+    asset: 'BTC',
+    description: '',
+    tags: [BUY_TAGS[0], BUY_TAGS[2]],
     snapshots: [
       {
         id: 'snap-1',
         thesisId: 'seed-1',
         content:
           '当前价位处于减半前的蓄力区间，链上数据显示长期持有者占比持续上升，交易所余额降至2年新低。宏观层面美联储暂停加息，流动性有望回暖。',
-        tags: [BUY_TAGS[0]], // 基本面驱动
+        tags: [BUY_TAGS[0]],
         timeline: '1Q',
         expectedReviewDate: addMonths(new Date(monthAgo), 3).toISOString(),
         createdAt: monthAgo,
+        links: ['https://glassnode.com/reports'],
+        influencedBy: 'PlanB (@100trillionUSD)',
+        followUp: {
+          id: 'fu-1',
+          snapshotId: 'snap-1',
+          comment: '链上数据继续向好，减半叙事正在兑现，维持看多。',
+          verdict: 'correct',
+          createdAt: weekAgo,
+        },
       },
     ],
     createdAt: monthAgo,
@@ -52,21 +61,23 @@ const SEED_THESES: Thesis[] = [
   },
   {
     id: 'seed-2',
-    name: 'SOL 生态实验',
-    description:
-      'Solana 生态 DeFi & meme 币短期投机。关注链上 TVL 增长和 DEX 交易量。严格止损 15%。',
-    zone: 'SOL 生态实验',
-    tags: [BUY_TAGS[4], SELL_TAGS[2]], // 叙事跟踪, 防守止损
+    name: 'Solana',
+    category: 'crypto',
+    asset: 'SOL',
+    description: '',
+    tags: [BUY_TAGS[4], SELL_TAGS[2]],
     snapshots: [
       {
         id: 'snap-2',
         thesisId: 'seed-2',
         content:
           'SOL 生态 TVL 突破 $8B，Jupiter 交易量创新高。Meme 币热度回升但需警惕泡沫。设置 $120 为关键支撑位，跌破即执行防守止损。',
-        tags: [BUY_TAGS[4], SELL_TAGS[2]], // 叙事跟踪, 防守止损
+        tags: [BUY_TAGS[4], SELL_TAGS[2]],
         timeline: '1W',
         expectedReviewDate: addWeeks(new Date(weekAgo), 1).toISOString(),
         createdAt: weekAgo,
+        links: [],
+        influencedBy: '',
       },
     ],
     createdAt: weekAgo,
@@ -74,10 +85,11 @@ const SEED_THESES: Thesis[] = [
   },
   {
     id: 'seed-3',
-    name: 'ETH 质押收益',
-    description: 'ETH 质押赚取稳定收益。关注 Lido 和 EigenLayer 的 restaking 叙事。',
-    zone: 'ETH 生态',
-    tags: [BUY_TAGS[0], BUY_TAGS[2]], // 基本面驱动, 定投计划执行
+    name: 'NVIDIA',
+    category: 'us-stock',
+    asset: 'NVDA',
+    description: '',
+    tags: [BUY_TAGS[0]],
     snapshots: [],
     createdAt: monthAgo,
     updatedAt: monthAgo,
@@ -86,15 +98,20 @@ const SEED_THESES: Thesis[] = [
 
 interface ThesisStore {
   theses: Thesis[];
-  addThesis: (thesis: Omit<Thesis, 'id' | 'snapshots' | 'createdAt' | 'updatedAt'>) => void;
+  addThesis: (thesis: Pick<Thesis, 'name' | 'category' | 'asset'>) => void;
   updateThesis: (
     id: string,
-    updates: Partial<Pick<Thesis, 'name' | 'description' | 'zone' | 'tags'>>
+    updates: Partial<Pick<Thesis, 'name' | 'description' | 'tags'>>
   ) => void;
   deleteThesis: (id: string) => void;
   addSnapshot: (
     thesisId: string,
     snapshot: Omit<Snapshot, 'id' | 'thesisId' | 'createdAt'>
+  ) => void;
+  addFollowUp: (
+    thesisId: string,
+    snapshotId: string,
+    followUp: { comment: string; verdict: Verdict }
   ) => void;
   reorderTheses: (theses: Thesis[]) => void;
 }
@@ -108,6 +125,8 @@ export const useThesisStore = create<ThesisStore>((set) => ({
         {
           ...thesis,
           id: generateId(),
+          description: '',
+          tags: [],
           snapshots: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -148,5 +167,32 @@ export const useThesisStore = create<ThesisStore>((set) => ({
           : t
       ),
     })),
+
+  addFollowUp: (thesisId, snapshotId, { comment, verdict }) =>
+    set((state) => ({
+      theses: state.theses.map((t) =>
+        t.id === thesisId
+          ? {
+              ...t,
+              snapshots: t.snapshots.map((s) =>
+                s.id === snapshotId
+                  ? {
+                      ...s,
+                      followUp: {
+                        id: generateId(),
+                        snapshotId,
+                        comment,
+                        verdict,
+                        createdAt: new Date().toISOString(),
+                      },
+                    }
+                  : s
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : t
+      ),
+    })),
+
   reorderTheses: (theses) => set({ theses }),
 }));
