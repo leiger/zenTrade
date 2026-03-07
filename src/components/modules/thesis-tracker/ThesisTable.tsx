@@ -122,6 +122,7 @@ function SortableRow({ row, onClick }: SortableRowProps) {
 // --- Main ThesisTable Component ---
 
 export function ThesisTable() {
+    const dndId = React.useId();
     const router = useRouter();
     const theses = useThesisStore((s) => s.theses);
     const deleteThesis = useThesisStore((s) => s.deleteThesis);
@@ -377,6 +378,7 @@ export function ThesisTable() {
 
             <div className="rounded-xl border bg-background/50 shadow-sm overflow-hidden">
                 <DndContext
+                    id={dndId}
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
