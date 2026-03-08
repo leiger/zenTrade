@@ -160,7 +160,7 @@ export function ThesisTable({ onCreateClick }: ThesisTableProps) {
                     const thesis = row.original;
                     const catConfig = getCategoryConfig(thesis.category);
                     return (
-                        <div className="flex items-center gap-3 min-w-[200px]">
+                        <div className="flex items-center gap-3 min-w-[140px]">
                             <span className="text-lg flex-shrink-0">{catConfig?.icon ?? '📁'}</span>
                             <div className="flex flex-col gap-0.5">
                                 <span className="font-semibold text-foreground">{thesis.name}</span>
@@ -220,7 +220,7 @@ export function ThesisTable({ onCreateClick }: ThesisTableProps) {
                 id: 'accuracy',
                 header: () => (
                     <div className="text-center">
-                        <span className="text-xs font-medium">正确率</span>
+                        <span className="font-medium">正确率</span>
                     </div>
                 ),
                 cell: ({ row }) => {
@@ -246,7 +246,7 @@ export function ThesisTable({ onCreateClick }: ThesisTableProps) {
                                 <Target className="h-3 w-3" />
                                 {rate}%
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
                                 <span className="flex items-center gap-0.5 text-emerald-500"><CircleCheck className="h-2.5 w-2.5" />{correct}</span>
                                 <span className="flex items-center gap-0.5 text-rose-500"><CircleX className="h-2.5 w-2.5" />{wrong}</span>
                                 <span className="flex items-center gap-0.5 text-amber-500"><CircleMinus className="h-2.5 w-2.5" />{neutral}</span>

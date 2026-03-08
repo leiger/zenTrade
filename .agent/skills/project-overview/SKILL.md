@@ -9,6 +9,7 @@ ZenTrade is a personal asset management tool designed to track investment logic,
 
 ## Technology Stack
 
+### Frontend (zentrade-app)
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
@@ -18,28 +19,37 @@ ZenTrade is a personal asset management tool designed to track investment logic,
 - **Date Handling**: date-fns
 - **Theming**: next-themes (Light/Dark mode)
 
+### Backend (zentrade-backend)
+- **Framework**: FastAPI
+- **Language**: Python
+- **Database**: SQLite
+
 ## Project Structure
 
 ```text
-zentrade-app/
-├── src/
-│   ├── app/                # Next.js App Router (Pages, Layouts)
-│   │   ├── thesis/         # Thesis Tracker module pages
-│   │   └── globals.css     # Global styles & Tailwind layers
-│   ├── components/
-│   │   ├── modules/        # Feature-specific components
-│   │   │   └── thesis-tracker/ # Components for the Thesis Tracker
-│   │   ├── shared/         # Reusable application-wide components (Sidebar, etc.)
-│   │   └── ui/             # shadcn/ui base components
-│   ├── constants/          # Global constants and presets (Tags, Zones)
-│   ├── hooks/              # Custom React hooks
-│   ├── lib/                # Utility functions and shared state stores
-│   │   ├── store.ts        # Zustand store for global state
-│   │   └── utils.ts        # Common utility functions (cn)
-│   └── types/              # TypeScript interfaces and types
-├── .agent/                 # Agent-specific skills and workflows
-├── .prettierrc             # Code formatting configuration
-└── components.json         # shadcn/ui configuration
+zenTrade/                        # Monorepo root
+├── .agent/                      # Agent-specific skills and workflows
+├── .cursorrules                 # Cursor workspace rules
+├── .gitignore                   # Root-level gitignore
+├── zentrade-app/                # Next.js frontend
+│   ├── src/
+│   │   ├── app/                 # App Router (Pages, Layouts)
+│   │   │   ├── thesis/          # Thesis Tracker module pages
+│   │   │   └── globals.css      # Global styles & Tailwind layers
+│   │   ├── components/
+│   │   │   ├── modules/         # Feature-specific components
+│   │   │   │   └── thesis-tracker/
+│   │   │   ├── shared/          # Reusable app-wide components (Sidebar, etc.)
+│   │   │   └── ui/              # shadcn/ui base components
+│   │   ├── constants/           # Global constants and presets
+│   │   ├── hooks/               # Custom React hooks
+│   │   ├── lib/                 # Utilities and state stores
+│   │   └── types/               # TypeScript interfaces and types
+│   ├── .prettierrc
+│   └── components.json          # shadcn/ui configuration
+└── zentrade-backend/            # FastAPI backend
+    ├── app/                     # Backend application code
+    └── requirements.txt
 ```
 
 ## Core Functional Modules

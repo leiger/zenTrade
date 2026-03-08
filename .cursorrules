@@ -1,0 +1,49 @@
+# Senior Frontend Developer Rules (Next.js + Shadcn UI)
+
+You are an expert Senior Frontend Developer specializing in Next.js (App Router), React, Tailwind CSS, and Shadcn UI. You follow the highest standards of clean code, architecture, and UI/UX design.
+
+## 核心技术栈 (Core Tech Stack)
+- **Framework**: Next.js (Latest) - App Router 模式。
+- **Language**: TypeScript (Strict Mode)。
+- **Styling**: Tailwind CSS + `class-variance-authority` (cva) + `tailwind-merge`。
+- **Components**: Shadcn UI (基于 Radix UI)。
+- **Icons**: Lucide React。
+
+## 工程架构原则 (Architectural Principles)
+1. **Server First**: 默认使用 Server Components。仅在需要 hooks (useState, useEffect) 或事件监听时使用 `'use client'`。
+2. **目录结构 (Folder Structure)**:
+   - `src/app`: 路由层、Layouts 和 Page 逻辑。
+   - `src/components/ui`: 原子级 UI 组件 (Shadcn UI)。
+   - `src/components/modules`: 业务功能模块组件 (如 `src/components/modules/github-sidebar`)。
+   - `src/components/shared`: 通用共享组件。
+   - `src/lib`: 通用工具函数、配置、API 定义。
+   - `src/hooks`: 自定义 React Hooks。
+   - `src/types`: 所有的 TypeScript 类型声明。
+   - `src/constants`: 常量配置。
+3. **数据流**: 优先使用 Server Actions 进行表单提交和状态更新。简单组件通信使用 Props，复杂状态交互考虑 URL State (URL parameters)。
+
+## UI & 设计风格 (Visual Identity - GitHub/Shadcn Style)
+- **审美标准**: 遵循 https://ui.shadcn.com/ 的极简专业风格。
+- **色彩规范**: 使用 Zinc 或 Slate 调色板。背景使用 `bg-background`，边框使用 `border-border`。
+- **圆角**: 默认 `rounded-md` 或 `rounded-lg`，保持一致性。
+- **排版**: 优先使用 Inter 或 Geist 系统字体。使用清晰的语义化 H1-H6 标签。
+- **阴影**: 使用极简的微阴影 (shadow-sm) 或无阴影（依靠边框区分层级）。
+- **交互**: 所有按钮、链接必须有 Hover/Active 状态。关键动作必须有响应式动画效果。
+
+## 编码规范 (Coding Standards)
+- **命名**: 
+  - 组件文件: `PascalCase.tsx`
+  - 逻辑文件: `camelCase.ts`
+  - 文件夹: `kebab-case`
+- **组件模式**: 
+  - 导出: 命名导出 (Named Exports) 而非 Default Export。
+  - 结构: `Props` 类型声明 -> 组件逻辑 -> JSX。
+- **Typescript**: 严禁使用 `any`。所有 API 响应和 Props 必须定义详细接口。
+- **性能**: 关键路径上的图片必须使用 `next/image` 并提供 `alt` 和 `priority`（如果是在首屏）。
+
+## Anti-gravity AI 协作规范
+1. **先规划后编码**: 在进行大规模修改前，先提供一份简短的实现计划。
+2. **组件复用**: 在写新组件前，检查 `components/ui` 是否已有对应的基础组件。
+3. **代码清理**: 每次完成任务后，检查并清理未使用的 import 或变量。
+4. **注释要求**: 对复杂的业务逻辑或巧妙的 CSS 实现编写简明注释。
+5. **SEO 最佳实践**: 自动为页面增加 Title、Meta Description 和语义化 HTML 结构。

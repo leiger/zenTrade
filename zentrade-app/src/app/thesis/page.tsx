@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useThesisStore } from '@/lib/store';
 import { ThesisTable } from '@/components/modules/thesis-tracker/ThesisTable';
 import { ThesisForm } from '@/components/modules/thesis-tracker/ThesisForm';
@@ -16,7 +16,13 @@ import { Plus, BrainCircuit, Activity, Camera, Clock } from 'lucide-react';
 
 export default function ThesisPage() {
   const theses = useThesisStore((s) => s.theses);
+  const loading = useThesisStore((s) => s.loading);
+  const fetchTheses = useThesisStore((s) => s.fetchTheses);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    fetchTheses();
+  }, [fetchTheses]);
 
   const pendingReviewCount = theses.reduce(
     (acc, t) =>

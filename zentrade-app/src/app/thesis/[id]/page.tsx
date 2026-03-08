@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useThesisStore } from '@/lib/store';
 import { getCategoryConfig } from '@/constants/assets';
@@ -34,9 +34,15 @@ export default function ThesisDetailPage() {
   const id = params.id as string;
 
   const thesis = useThesisStore((s) => s.theses.find((t) => t.id === id));
+  const loading = useThesisStore((s) => s.loading);
+  const fetchTheses = useThesisStore((s) => s.fetchTheses);
   const deleteThesis = useThesisStore((s) => s.deleteThesis);
   const updateThesis = useThesisStore((s) => s.updateThesis);
   const addFollowUp = useThesisStore((s) => s.addFollowUp);
+
+  useEffect(() => {
+    fetchTheses();
+  }, [fetchTheses]);
 
   const [snapshotDialogOpen, setSnapshotDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -61,6 +67,14 @@ export default function ThesisDetailPage() {
     });
     setEditDialogOpen(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   if (!thesis) {
     return (
