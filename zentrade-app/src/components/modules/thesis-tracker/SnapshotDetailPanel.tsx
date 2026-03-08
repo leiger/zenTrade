@@ -29,7 +29,6 @@ import {
   Save,
   Camera,
   CalendarClock,
-  CheckCircle2,
   Clock,
   Link2,
   UserRound,
@@ -50,7 +49,8 @@ interface FormState {
   reviewDate: Date;
   links: string[];
   linkInput: string;
-  influencedBy: string;
+  influencedBy: string[];
+  influencedByInput: string;
 }
 
 function emptyForm(): FormState {
@@ -62,7 +62,8 @@ function emptyForm(): FormState {
     reviewDate: getReviewDate('1W'),
     links: [],
     linkInput: '',
-    influencedBy: '',
+    influencedBy: [],
+    influencedByInput: '',
   };
 }
 
@@ -75,7 +76,8 @@ function formFromSnapshot(snapshot: Snapshot): FormState {
     reviewDate: new Date(snapshot.expectedReviewDate),
     links: [...snapshot.links],
     linkInput: '',
-    influencedBy: snapshot.influencedBy,
+    influencedBy: Array.isArray(snapshot.influencedBy) ? [...snapshot.influencedBy] : [],
+    influencedByInput: '',
   };
 }
 
@@ -134,7 +136,7 @@ export function SnapshotDetailPanel({
         timeline: form.timeline,
         expectedReviewDate: form.reviewDate.toISOString(),
         links: form.links,
-        influencedBy: form.influencedBy.trim(),
+        influencedBy: form.influencedBy,
       });
       onClose();
     } else {
@@ -145,7 +147,7 @@ export function SnapshotDetailPanel({
         timeline: form.timeline,
         expectedReviewDate: form.reviewDate.toISOString(),
         links: form.links,
-        influencedBy: form.influencedBy.trim(),
+        influencedBy: form.influencedBy,
       });
       setIsEditing(false);
     }
@@ -169,6 +171,16 @@ export function SnapshotDetailPanel({
 
   const removeLink = (index: number) => {
     patch({ links: form.links.filter((_, i) => i !== index) });
+  };
+
+  const addInfluencedBy = () => {
+    const val = form.influencedByInput.trim();
+    if (!val) return;
+    patch({ influencedBy: [...form.influencedBy, val], influencedByInput: '' });
+  };
+
+  const removeInfluencedBy = (index: number) => {
+    patch({ influencedBy: form.influencedBy.filter((_, i) => i !== index) });
   };
 
   const selectPreset = (preset: TimelineOption) => {
@@ -312,7 +324,6 @@ export function SnapshotDetailPanel({
                   )}
                   suppressHydrationWarning
                 >
-                  {isOverdue ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
                   {hasFollowUp ? '已回顾' : isOverdue ? '待回顾' : '回顾于'}{' '}
                   {format(reviewDate, 'yyyy年MM月dd日', { locale: zhCN })}
                 </span>
@@ -320,21 +331,49 @@ export function SnapshotDetailPanel({
             </div>
 
             {/* Influenced by */}
-            {(isEditing || snapshot?.influencedBy) && (
+            {(isEditing || (snapshot?.influencedBy?.length ?? 0) > 0) && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <UserRound className="h-4 w-4" />
                   受谁影响
                 </Label>
                 {isEditing ? (
-                  <Input
-                    value={form.influencedBy}
-                    onChange={(e) => patch({ influencedBy: e.target.value })}
-                    className="h-8 text-sm bg-background"
-                    placeholder="PlanB, 某研报…"
-                  />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        value={form.influencedByInput}
+                        onChange={(e) => patch({ influencedByInput: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addInfluencedBy(); } }}
+                        className="h-8 text-sm bg-background"
+                        placeholder="PlanB, 某研报…回车添加"
+                      />
+                      <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={addInfluencedBy} disabled={!form.influencedByInput.trim()}>
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {form.influencedBy.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {form.influencedBy.map((val, i) => (
+                          <Badge key={i} variant="secondary" className="font-normal text-xs gap-1.5 max-w-[240px] py-0.5">
+                            <UserRound className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{val}</span>
+                            <button type="button" className="ml-0.5 rounded-full hover:bg-black/10 p-0" onClick={() => removeInfluencedBy(i)}>
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <span className="text-sm font-medium text-foreground/80">{snapshot!.influencedBy}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {snapshot!.influencedBy.map((val, i) => (
+                      <Badge key={i} variant="secondary" className="font-normal text-xs gap-1.5 py-0.5 text-foreground/80">
+                        <UserRound className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{val}</span>
+                      </Badge>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -384,7 +423,6 @@ export function SnapshotDetailPanel({
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-sm text-primary/70 hover:text-primary transition-colors group/link"
                       >
-                        <Link2 className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate underline underline-offset-2 decoration-primary/30 group-hover/link:decoration-primary">
                           {link.replace(/^https?:\/\//, '').split('/')[0]}
                         </span>

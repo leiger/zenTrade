@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
@@ -15,6 +16,18 @@ router = APIRouter(prefix="/theses", tags=["theses"])
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_influenced_by(val: str) -> list[str]:
+    if not val:
+        return []
+    try:
+        parsed = json.loads(val)
+        if isinstance(parsed, list):
+            return [str(v) for v in parsed]
+        return [str(parsed)]
+    except Exception:
+        return [v.strip() for v in val.split(",") if v.strip()]
 
 
 async def _load_thesis_tags(db, thesis_id: str) -> list[Tag]:
@@ -64,12 +77,14 @@ async def _load_snapshots(db, thesis_id: str) -> list[Snapshot]:
         sid = r["id"]
         result.append(Snapshot(
             id=sid, thesis_id=r["thesis_id"], content=r["content"],
+            ai_analysis=r["ai_analysis"],
             tags=await _load_snapshot_tags(db, sid),
             timeline=r["timeline"],
             expected_review_date=r["expected_review_date"],
             created_at=r["created_at"],
+            updated_at=r["updated_at"],
             links=await _load_snapshot_links(db, sid),
-            influenced_by=r["influenced_by"],
+            influenced_by=_parse_influenced_by(r["influenced_by"]),
             follow_up=await _load_follow_up(db, sid),
         ))
     return result

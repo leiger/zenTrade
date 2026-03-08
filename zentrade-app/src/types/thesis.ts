@@ -40,7 +40,7 @@ export interface Snapshot {
   /** 相关链接 */
   links: string[];
   /** 观点受谁影响 */
-  influencedBy: string;
+  influencedBy: string[];
   /** 回顾跟进 */
   followUp?: FollowUp;
 }

@@ -48,7 +48,7 @@ class SnapshotCreate(BaseModel):
     timeline: TimelineOption
     expected_review_date: str
     links: list[str] = []
-    influenced_by: str = ""
+    influenced_by: list[str] = []
 
 
 class SnapshotUpdate(BaseModel):
@@ -58,7 +58,7 @@ class SnapshotUpdate(BaseModel):
     timeline: Optional[TimelineOption] = None
     expected_review_date: Optional[str] = None
     links: Optional[list[str]] = None
-    influenced_by: Optional[str] = None
+    influenced_by: Optional[list[str]] = None
 
 
 class Snapshot(BaseModel):
@@ -72,7 +72,7 @@ class Snapshot(BaseModel):
     created_at: str
     updated_at: str = ""
     links: list[str] = []
-    influenced_by: str = ""
+    influenced_by: list[str] = []
     follow_up: Optional[FollowUp] = None
 
 

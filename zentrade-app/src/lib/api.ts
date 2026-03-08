@@ -50,7 +50,7 @@ function mapSnapshot(raw: Record<string, unknown>): Snapshot {
     createdAt: raw.created_at as string,
     updatedAt: (raw.updated_at as string) || '',
     links: (raw.links as string[]) || [],
-    influencedBy: (raw.influenced_by as string) || '',
+    influencedBy: (raw.influenced_by as string[]) || [],
     followUp: mapFollowUp(raw.follow_up as Record<string, string> | null),
   };
 }
@@ -121,7 +121,7 @@ export async function createSnapshot(
     timeline: string;
     expectedReviewDate: string;
     links: string[];
-    influencedBy: string;
+    influencedBy: string[];
   }
 ): Promise<Snapshot> {
   const raw = await request<Record<string, unknown>>(`/theses/${thesisId}/snapshots`, {
@@ -149,7 +149,7 @@ export async function updateSnapshot(
     timeline?: string;
     expectedReviewDate?: string;
     links?: string[];
-    influencedBy?: string;
+    influencedBy?: string[];
   }
 ): Promise<Snapshot> {
   const payload: Record<string, unknown> = {};
@@ -201,4 +201,11 @@ export async function upsertFollowUp(
     { method: 'PUT', body: JSON.stringify(data) }
   );
   return mapFollowUp(raw)!;
+}
+
+export async function deleteFollowUp(thesisId: string, snapshotId: string): Promise<void> {
+  await request<void>(
+    `/theses/${thesisId}/snapshots/${snapshotId}/follow-up`,
+    { method: 'DELETE' }
+  );
 }

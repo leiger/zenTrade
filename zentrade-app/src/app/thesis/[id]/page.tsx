@@ -61,12 +61,14 @@ export default function ThesisDetailPage() {
   const fetchTheses = useThesisStore((s) => s.fetchTheses);
   const deleteThesis = useThesisStore((s) => s.deleteThesis);
   const addFollowUp = useThesisStore((s) => s.addFollowUp);
+  const deleteFollowUp = useThesisStore((s) => s.deleteFollowUp);
 
   useEffect(() => {
     fetchTheses();
   }, [fetchTheses]);
 
   const [drawerState, setDrawerState] = useState<DrawerState>(null);
+  const [closing, setClosing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (loading) {
@@ -115,7 +117,13 @@ export default function ThesisDetailPage() {
       ? thesis.snapshots.find((s) => s.id === drawerState.snapshotId)
       : undefined;
 
-  const closeDrawer = () => setDrawerState(null);
+  const closeDrawer = () => {
+    setClosing(true);
+    setTimeout(() => {
+      setDrawerState(null);
+      setClosing(false);
+    }, 300);
+  };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -255,19 +263,34 @@ export default function ThesisDetailPage() {
           onAddFollowUp={(snapshotId, comment, verdict) =>
             addFollowUp(thesis.id, snapshotId, { comment, verdict })
           }
+          onDeleteFollowUp={(snapshotId) =>
+            deleteFollowUp(thesis.id, snapshotId)
+          }
         />
       </div>
 
       {/* ── Drawer (overlay + panel) ── */}
-      {drawerOpen && (
+      {(drawerOpen || closing) && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/40 animate-in fade-in-0 duration-200"
+            className={cn(
+              'fixed inset-0 z-40 bg-black/40 duration-200',
+              closing
+                ? 'animate-out fade-out-0 fill-mode-forwards'
+                : 'animate-in fade-in-0',
+            )}
             onClick={closeDrawer}
           />
-          <div className="fixed top-14 right-4 sm:right-6 md:right-8 bottom-2 z-40 w-[480px] rounded-xl border shadow-2xl bg-card animate-in slide-in-from-right duration-300 overflow-hidden">
+          <div
+            className={cn(
+              'fixed top-14 right-4 sm:right-6 md:right-8 bottom-2 z-40 w-[480px] rounded-xl border shadow-2xl bg-card overflow-hidden duration-300',
+              closing
+                ? 'animate-out slide-out-to-right fill-mode-forwards'
+                : 'animate-in slide-in-from-right',
+            )}
+          >
             <SnapshotDetailPanel
-              key={drawerState.mode === 'view' ? drawerState.snapshotId : '__create__'}
+              key={drawerState?.mode === 'view' ? drawerState.snapshotId : '__create__'}
               snapshot={selectedSnapshot}
               thesisId={thesis.id}
               onClose={closeDrawer}

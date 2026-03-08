@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
@@ -12,6 +13,18 @@ router = APIRouter(prefix="/theses/{thesis_id}/snapshots", tags=["snapshots"])
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_influenced_by(val: str) -> list[str]:
+    if not val:
+        return []
+    try:
+        parsed = json.loads(val)
+        if isinstance(parsed, list):
+            return [str(v) for v in parsed]
+        return [str(parsed)]
+    except Exception:
+        return [v.strip() for v in val.split(",") if v.strip()]
 
 
 async def _load_snapshot_tags(db, snapshot_id: str) -> list[Tag]:
@@ -54,7 +67,7 @@ async def _build_snapshot(db, r) -> Snapshot:
         created_at=r["created_at"],
         updated_at=r["updated_at"] or "",
         links=await _load_snapshot_links(db, sid),
-        influenced_by=r["influenced_by"],
+        influenced_by=_parse_influenced_by(r["influenced_by"]),
         follow_up=await _load_follow_up(db, sid),
     )
 
@@ -90,10 +103,12 @@ async def create_snapshot(thesis_id: str, body: SnapshotCreate):
         sid = str(uuid.uuid4())
         now = _now_iso()
 
+        inf_str = json.dumps(body.influenced_by, ensure_ascii=False) if body.influenced_by else ""
+
         await db.execute(
             "INSERT INTO snapshots (id, thesis_id, content, ai_analysis, timeline, expected_review_date, influenced_by, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (sid, thesis_id, body.content, body.ai_analysis, body.timeline, body.expected_review_date, body.influenced_by, now, now),
+            (sid, thesis_id, body.content, body.ai_analysis, body.timeline, body.expected_review_date, inf_str, now, now),
         )
 
         for tag_id in body.tags:
@@ -141,7 +156,7 @@ async def update_snapshot(thesis_id: str, snapshot_id: str, body: SnapshotUpdate
             params.append(body.ai_analysis)
         if body.influenced_by is not None:
             sets.append("influenced_by = ?")
-            params.append(body.influenced_by)
+            params.append(json.dumps(body.influenced_by, ensure_ascii=False))
         if body.timeline is not None:
             sets.append("timeline = ?")
             params.append(body.timeline)

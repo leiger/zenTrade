@@ -97,37 +97,6 @@ async def _migrate(db: aiosqlite.Connection):
         return
     schema_sql = str(row[0])
 
-    # Migration: add 'custom' to timeline CHECK constraint
-    if "'custom'" not in schema_sql and "CHECK" in schema_sql:
-        await db.execute("PRAGMA foreign_keys=OFF")
-        await db.executescript("""
-            CREATE TABLE _snapshots_mig (
-                id TEXT PRIMARY KEY, thesis_id TEXT NOT NULL,
-                content TEXT NOT NULL DEFAULT '', timeline TEXT NOT NULL,
-                expected_review_date TEXT NOT NULL,
-                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
-            );
-            INSERT INTO _snapshots_mig SELECT id, thesis_id, content, timeline,
-                expected_review_date, influenced_by, created_at FROM snapshots;
-            DROP TABLE snapshots;
-            CREATE TABLE snapshots (
-                id TEXT PRIMARY KEY,
-                thesis_id TEXT NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
-                content TEXT NOT NULL DEFAULT '',
-                ai_analysis TEXT NOT NULL DEFAULT '',
-                timeline TEXT NOT NULL CHECK(timeline IN ('1D','1W','1M','1Q','custom')),
-                expected_review_date TEXT NOT NULL,
-                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
-            );
-            INSERT INTO snapshots (id, thesis_id, content, timeline,
-                expected_review_date, influenced_by, created_at)
-                SELECT * FROM _snapshots_mig;
-            DROP TABLE _snapshots_mig;
-        """)
-        await db.commit()
-        await db.execute("PRAGMA foreign_keys=ON")
-        return
-
     # Migration: add ai_analysis column if missing
     if "ai_analysis" not in schema_sql:
         await db.execute(
@@ -141,6 +110,39 @@ async def _migrate(db: aiosqlite.Connection):
             "ALTER TABLE snapshots ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
         )
         await db.commit()
+
+    # Migration: add 'custom' to timeline CHECK constraint
+    if "'custom'" not in schema_sql and "CHECK" in schema_sql:
+        await db.execute("PRAGMA foreign_keys=OFF")
+        await db.executescript("""
+            CREATE TABLE _snapshots_mig (
+                id TEXT PRIMARY KEY, thesis_id TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '', ai_analysis TEXT NOT NULL DEFAULT '', 
+                timeline TEXT NOT NULL,
+                expected_review_date TEXT NOT NULL,
+                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO _snapshots_mig SELECT id, thesis_id, content, ai_analysis, timeline,
+                expected_review_date, influenced_by, created_at, updated_at FROM snapshots;
+            DROP TABLE snapshots;
+            CREATE TABLE snapshots (
+                id TEXT PRIMARY KEY,
+                thesis_id TEXT NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+                content TEXT NOT NULL DEFAULT '',
+                ai_analysis TEXT NOT NULL DEFAULT '',
+                timeline TEXT NOT NULL CHECK(timeline IN ('1D','1W','1M','1Q','custom')),
+                expected_review_date TEXT NOT NULL,
+                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO snapshots (id, thesis_id, content, ai_analysis, timeline,
+                expected_review_date, influenced_by, created_at, updated_at)
+                SELECT * FROM _snapshots_mig;
+            DROP TABLE _snapshots_mig;
+        """)
+        await db.commit()
+        await db.execute("PRAGMA foreign_keys=ON")
 
 
 async def init_db():

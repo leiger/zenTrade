@@ -40,7 +40,8 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
 
   const [links, setLinks] = useState<string[]>([]);
   const [linkInput, setLinkInput] = useState('');
-  const [influencedBy, setInfluencedBy] = useState('');
+  const [influencedBy, setInfluencedBy] = useState<string[]>([]);
+  const [influencedByInput, setInfluencedByInput] = useState('');
 
   const step1Valid = content.trim().length > 0;
   const step2Valid = timeline !== 'custom' || !!customDate;
@@ -56,6 +57,17 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
     setLinks((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleAddInfluencedBy = () => {
+    const val = influencedByInput.trim();
+    if (!val) return;
+    setInfluencedBy((prev) => [...prev, val]);
+    setInfluencedByInput('');
+  };
+
+  const handleRemoveInfluencedBy = (index: number) => {
+    setInfluencedBy((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = () => {
     if (!step1Valid || !step2Valid) return;
 
@@ -69,7 +81,7 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
       timeline,
       expectedReviewDate: reviewDate.toISOString(),
       links,
-      influencedBy: influencedBy.trim(),
+      influencedBy,
     });
 
     setContent('');
@@ -79,7 +91,8 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
     setCustomDate('');
     setLinks([]);
     setLinkInput('');
-    setInfluencedBy('');
+    setInfluencedBy([]);
+    setInfluencedByInput('');
     setStep(1);
     onSuccess?.();
   };
@@ -185,13 +198,31 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
                 <UserRound className="h-3 w-3" />
                 受谁影响
               </Label>
-              <Input
-                id="influenced-by"
-                placeholder="PlanB, 某研报…"
-                value={influencedBy}
-                onChange={(e) => setInfluencedBy(e.target.value)}
-                className="h-8 text-xs bg-background"
-              />
+              <div className="flex items-center gap-1">
+                <Input
+                  id="influenced-by"
+                  placeholder="PlanB, 某研报…"
+                  value={influencedByInput}
+                  onChange={(e) => setInfluencedByInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddInfluencedBy();
+                    }
+                  }}
+                  className="h-8 text-xs bg-background"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={handleAddInfluencedBy}
+                  disabled={!influencedByInput.trim()}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1 text-xs">
@@ -224,6 +255,28 @@ export function SnapshotForm({ thesisId, onSuccess }: SnapshotFormProps) {
               </div>
             </div>
           </div>
+
+          {influencedBy.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {influencedBy.map((val, i) => (
+                <Badge
+                  key={`inf-${i}`}
+                  variant="secondary"
+                  className="font-normal text-xs gap-1 max-w-[200px]"
+                >
+                  <UserRound className="h-2.5 w-2.5 shrink-0" />
+                  <span className="truncate">{val}</span>
+                  <button
+                    type="button"
+                    className="ml-0.5 rounded-full hover:bg-black/10 p-0"
+                    onClick={() => handleRemoveInfluencedBy(i)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
 
           {links.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

@@ -32,7 +32,7 @@ async def seed_data():
             (
                 "snap-1", "seed-1",
                 "当前价位处于减半前的蓄力区间，链上数据显示长期持有者占比持续上升，交易所余额降至2年新低。宏观层面美联储暂停加息，流动性有望回暖。",
-                "1Q", review_date, "PlanB (@100trillionUSD)", month_ago.isoformat(),
+                "1Q", review_date, '["PlanB (@100trillionUSD)"]', month_ago.isoformat(),
             ),
         )
         await db.execute("INSERT INTO snapshot_tags VALUES (?, ?)", ("snap-1", "buy-fundamental"))

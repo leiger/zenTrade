@@ -44,7 +44,7 @@ interface ThesisStore {
       timeline?: string;
       expectedReviewDate?: string;
       links?: string[];
-      influencedBy?: string;
+      influencedBy?: string[];
     }
   ) => Promise<void>;
   deleteSnapshot: (thesisId: string, snapshotId: string) => Promise<void>;
@@ -53,6 +53,7 @@ interface ThesisStore {
     snapshotId: string,
     followUp: { comment: string; verdict: Verdict }
   ) => Promise<void>;
+  deleteFollowUp: (thesisId: string, snapshotId: string) => Promise<void>;
   reorderTheses: (theses: Thesis[]) => Promise<void>;
 }
 
@@ -159,6 +160,16 @@ export const useThesisStore = create<ThesisStore>((set) => ({
       set({ theses });
     } catch (e) {
       console.error('Failed to add follow-up:', e);
+    }
+  },
+
+  deleteFollowUp: async (thesisId, snapshotId) => {
+    try {
+      await api.deleteFollowUp(thesisId, snapshotId);
+      const theses = await api.fetchTheses();
+      set({ theses });
+    } catch (e) {
+      console.error('Failed to delete follow-up:', e);
     }
   },
 
