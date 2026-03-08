@@ -20,8 +20,8 @@ export const SELL_TAGS: ThesisTag[] = [
 /** 所有预设标签 */
 export const ALL_TAGS: ThesisTag[] = [...BUY_TAGS, ...SELL_TAGS];
 
-/** 时间轴选项 */
-export const TIMELINE_OPTIONS: { value: TimelineOption; label: string; description: string }[] = [
+/** 时间轴选项（预设） */
+export const TIMELINE_PRESETS: { value: TimelineOption; label: string; description: string }[] = [
   { value: '1D', label: '1 天', description: '明天回顾' },
   { value: '1W', label: '1 周', description: '下周回顾' },
   { value: '1M', label: '1 月', description: '下月回顾' },

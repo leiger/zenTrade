@@ -31,10 +31,12 @@ CREATE TABLE IF NOT EXISTS snapshots (
     id                   TEXT PRIMARY KEY,
     thesis_id            TEXT NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
     content              TEXT NOT NULL DEFAULT '',
-    timeline             TEXT NOT NULL CHECK(timeline IN ('1D','1W','1M','1Q')),
+    ai_analysis          TEXT NOT NULL DEFAULT '',
+    timeline             TEXT NOT NULL CHECK(timeline IN ('1D','1W','1M','1Q','custom')),
     expected_review_date TEXT NOT NULL,
     influenced_by        TEXT NOT NULL DEFAULT '',
-    created_at           TEXT NOT NULL
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS snapshot_tags (
@@ -85,11 +87,68 @@ async def get_db() -> aiosqlite.Connection:
     return db
 
 
+async def _migrate(db: aiosqlite.Connection):
+    """Run schema migrations for existing databases."""
+    cursor = await db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='snapshots'"
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return
+    schema_sql = str(row[0])
+
+    # Migration: add 'custom' to timeline CHECK constraint
+    if "'custom'" not in schema_sql and "CHECK" in schema_sql:
+        await db.execute("PRAGMA foreign_keys=OFF")
+        await db.executescript("""
+            CREATE TABLE _snapshots_mig (
+                id TEXT PRIMARY KEY, thesis_id TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '', timeline TEXT NOT NULL,
+                expected_review_date TEXT NOT NULL,
+                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+            );
+            INSERT INTO _snapshots_mig SELECT id, thesis_id, content, timeline,
+                expected_review_date, influenced_by, created_at FROM snapshots;
+            DROP TABLE snapshots;
+            CREATE TABLE snapshots (
+                id TEXT PRIMARY KEY,
+                thesis_id TEXT NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+                content TEXT NOT NULL DEFAULT '',
+                ai_analysis TEXT NOT NULL DEFAULT '',
+                timeline TEXT NOT NULL CHECK(timeline IN ('1D','1W','1M','1Q','custom')),
+                expected_review_date TEXT NOT NULL,
+                influenced_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+            );
+            INSERT INTO snapshots (id, thesis_id, content, timeline,
+                expected_review_date, influenced_by, created_at)
+                SELECT * FROM _snapshots_mig;
+            DROP TABLE _snapshots_mig;
+        """)
+        await db.commit()
+        await db.execute("PRAGMA foreign_keys=ON")
+        return
+
+    # Migration: add ai_analysis column if missing
+    if "ai_analysis" not in schema_sql:
+        await db.execute(
+            "ALTER TABLE snapshots ADD COLUMN ai_analysis TEXT NOT NULL DEFAULT ''"
+        )
+        await db.commit()
+
+    # Migration: add updated_at column if missing
+    if "updated_at" not in schema_sql:
+        await db.execute(
+            "ALTER TABLE snapshots ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
+        )
+        await db.commit()
+
+
 async def init_db():
     db = await get_db()
     try:
         await db.executescript(SCHEMA)
         await db.executescript(SEED_TAGS)
+        await _migrate(db)
         await db.commit()
     finally:
         await db.close()

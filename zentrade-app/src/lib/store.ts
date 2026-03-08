@@ -15,6 +15,8 @@ export function getReviewDate(timeline: TimelineOption, from: Date = new Date())
       return addMonths(from, 1);
     case '1Q':
       return addMonths(from, 3);
+    case 'custom':
+      return from;
   }
 }
 
@@ -30,8 +32,22 @@ interface ThesisStore {
   deleteThesis: (id: string) => Promise<void>;
   addSnapshot: (
     thesisId: string,
-    snapshot: Omit<Snapshot, 'id' | 'thesisId' | 'createdAt'>
+    snapshot: Omit<Snapshot, 'id' | 'thesisId' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>;
+  updateSnapshot: (
+    thesisId: string,
+    snapshotId: string,
+    updates: {
+      content?: string;
+      aiAnalysis?: string;
+      tags?: string[];
+      timeline?: string;
+      expectedReviewDate?: string;
+      links?: string[];
+      influencedBy?: string;
+    }
+  ) => Promise<void>;
+  deleteSnapshot: (thesisId: string, snapshotId: string) => Promise<void>;
   addFollowUp: (
     thesisId: string,
     snapshotId: string,
@@ -102,6 +118,7 @@ export const useThesisStore = create<ThesisStore>((set) => ({
     try {
       await api.createSnapshot(thesisId, {
         content: snapshot.content,
+        aiAnalysis: snapshot.aiAnalysis,
         tags: snapshot.tags.map((t) => t.id),
         timeline: snapshot.timeline,
         expectedReviewDate: snapshot.expectedReviewDate,
@@ -112,6 +129,26 @@ export const useThesisStore = create<ThesisStore>((set) => ({
       set({ theses });
     } catch (e) {
       console.error('Failed to add snapshot:', e);
+    }
+  },
+
+  updateSnapshot: async (thesisId, snapshotId, updates) => {
+    try {
+      await api.updateSnapshot(thesisId, snapshotId, updates);
+      const theses = await api.fetchTheses();
+      set({ theses });
+    } catch (e) {
+      console.error('Failed to update snapshot:', e);
+    }
+  },
+
+  deleteSnapshot: async (thesisId, snapshotId) => {
+    try {
+      await api.deleteSnapshot(thesisId, snapshotId);
+      const theses = await api.fetchTheses();
+      set({ theses });
+    } catch (e) {
+      console.error('Failed to delete snapshot:', e);
     }
   },
 

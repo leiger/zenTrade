@@ -43,10 +43,12 @@ function mapSnapshot(raw: Record<string, unknown>): Snapshot {
     id: raw.id as string,
     thesisId: raw.thesis_id as string,
     content: raw.content as string,
+    aiAnalysis: (raw.ai_analysis as string) || '',
     tags: ((raw.tags as Record<string, string>[]) || []).map(mapTag),
     timeline: raw.timeline as Snapshot['timeline'],
     expectedReviewDate: raw.expected_review_date as string,
     createdAt: raw.created_at as string,
+    updatedAt: (raw.updated_at as string) || '',
     links: (raw.links as string[]) || [],
     influencedBy: (raw.influenced_by as string) || '',
     followUp: mapFollowUp(raw.follow_up as Record<string, string> | null),
@@ -114,6 +116,7 @@ export async function createSnapshot(
   thesisId: string,
   data: {
     content: string;
+    aiAnalysis: string;
     tags: string[];
     timeline: string;
     expectedReviewDate: string;
@@ -125,6 +128,7 @@ export async function createSnapshot(
     method: 'POST',
     body: JSON.stringify({
       content: data.content,
+      ai_analysis: data.aiAnalysis,
       tags: data.tags,
       timeline: data.timeline,
       expected_review_date: data.expectedReviewDate,
@@ -133,6 +137,58 @@ export async function createSnapshot(
     }),
   });
   return mapSnapshot(raw);
+}
+
+export async function updateSnapshot(
+  thesisId: string,
+  snapshotId: string,
+  data: {
+    content?: string;
+    aiAnalysis?: string;
+    tags?: string[];
+    timeline?: string;
+    expectedReviewDate?: string;
+    links?: string[];
+    influencedBy?: string;
+  }
+): Promise<Snapshot> {
+  const payload: Record<string, unknown> = {};
+  if (data.content !== undefined) payload.content = data.content;
+  if (data.aiAnalysis !== undefined) payload.ai_analysis = data.aiAnalysis;
+  if (data.tags !== undefined) payload.tags = data.tags;
+  if (data.timeline !== undefined) payload.timeline = data.timeline;
+  if (data.expectedReviewDate !== undefined) payload.expected_review_date = data.expectedReviewDate;
+  if (data.links !== undefined) payload.links = data.links;
+  if (data.influencedBy !== undefined) payload.influenced_by = data.influencedBy;
+
+  const raw = await request<Record<string, unknown>>(
+    `/theses/${thesisId}/snapshots/${snapshotId}`,
+    { method: 'PATCH', body: JSON.stringify(payload) }
+  );
+  return mapSnapshot(raw);
+}
+
+export async function deleteSnapshot(thesisId: string, snapshotId: string): Promise<void> {
+  await request<void>(`/theses/${thesisId}/snapshots/${snapshotId}`, { method: 'DELETE' });
+}
+
+// ── Tags ────────────────────────────────────────────
+
+export async function fetchTags(): Promise<ThesisTag[]> {
+  const raw = await request<Record<string, string>[]>('/tags');
+  return raw.map(mapTag);
+}
+
+export async function createTag(data: { label: string; category: string }): Promise<ThesisTag> {
+  const raw = await request<Record<string, string>>('/tags', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return mapTag(raw);
+}
+
+export async function deleteTag(tagId: string): Promise<void> {
+  await request<void>(`/tags/${tagId}`, { method: 'DELETE' });
 }
 
 export async function upsertFollowUp(

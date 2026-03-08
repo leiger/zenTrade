@@ -3,15 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useThesisStore } from '@/lib/store';
-import { getCategoryConfig } from '@/constants/assets';
+import { getCategoryConfig, getAssetName } from '@/constants/assets';
 import { SnapshotTimeline } from '@/components/modules/thesis-tracker/SnapshotTimeline';
-import { SnapshotForm } from '@/components/modules/thesis-tracker/SnapshotForm';
-import { TagSelector } from '@/components/modules/thesis-tracker/TagSelector';
+import { SnapshotDetailPanel } from '@/components/modules/thesis-tracker/SnapshotDetailPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -19,14 +15,41 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { ArrowLeft, Camera, Trash2, Pencil, BrainCircuit } from 'lucide-react';
-import { ConfirmPopover } from '@/components/modules/thesis-tracker/ConfirmPopover';
-import type { ThesisTag } from '@/types/thesis';
+import {
+  ArrowLeft,
+  Camera,
+  Trash2,
+  MoreHorizontal,
+  BrainCircuit,
+  TriangleAlert,
+  CalendarDays,
+  MessageSquareText,
+  Target,
+  CircleCheck,
+  CircleX,
+  CircleMinus,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+type DrawerState =
+  | null
+  | { mode: 'create' }
+  | { mode: 'view'; snapshotId: string };
 
 export default function ThesisDetailPage() {
   const params = useParams();
@@ -37,36 +60,14 @@ export default function ThesisDetailPage() {
   const loading = useThesisStore((s) => s.loading);
   const fetchTheses = useThesisStore((s) => s.fetchTheses);
   const deleteThesis = useThesisStore((s) => s.deleteThesis);
-  const updateThesis = useThesisStore((s) => s.updateThesis);
   const addFollowUp = useThesisStore((s) => s.addFollowUp);
 
   useEffect(() => {
     fetchTheses();
   }, [fetchTheses]);
 
-  const [snapshotDialogOpen, setSnapshotDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editTags, setEditTags] = useState<ThesisTag[]>([]);
-
-  const openEditDialog = () => {
-    if (!thesis) return;
-    setEditName(thesis.name);
-    setEditDescription(thesis.description);
-    setEditTags(thesis.tags);
-    setEditDialogOpen(true);
-  };
-
-  const handleEditSave = () => {
-    if (!thesis || !editName.trim()) return;
-    updateThesis(thesis.id, {
-      name: editName.trim(),
-      description: editDescription.trim(),
-      tags: editTags,
-    });
-    setEditDialogOpen(false);
-  };
+  const [drawerState, setDrawerState] = useState<DrawerState>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (loading) {
     return (
@@ -95,180 +96,206 @@ export default function ThesisDetailPage() {
     router.push('/thesis');
   };
 
+  const assetDisplayName = thesis.asset
+    ? getAssetName(thesis.category, thesis.asset)
+    : null;
+
+  const snapshotCount = thesis.snapshots.length;
+  const reviewedSnapshots = thesis.snapshots.filter((s) => s.followUp);
+  const correctCount = reviewedSnapshots.filter((s) => s.followUp!.verdict === 'correct').length;
+  const wrongCount = reviewedSnapshots.filter((s) => s.followUp!.verdict === 'wrong').length;
+  const neutralCount = reviewedSnapshots.filter((s) => s.followUp!.verdict === 'neutral').length;
+  const accuracyRate = reviewedSnapshots.length > 0
+    ? Math.round((correctCount / reviewedSnapshots.length) * 100)
+    : null;
+
+  const drawerOpen = drawerState !== null;
+  const selectedSnapshot =
+    drawerState?.mode === 'view'
+      ? thesis.snapshots.find((s) => s.id === drawerState.snapshotId)
+      : undefined;
+
+  const closeDrawer = () => setDrawerState(null);
+
   return (
     <div className="max-w-6xl mx-auto">
-      {/* 返回 & 操作 */}
-      <div className="flex items-center justify-between mb-6">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between mb-5">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push('/thesis')}
-          className="gap-1.5 text-muted-foreground hover:text-foreground"
+          className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           返回列表
         </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={openEditDialog}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            编辑
-          </Button>
-          <ConfirmPopover
-            title="删除看法"
-            description={`确认删除「${thesis.name}」？所有关联的快照也会被一并删除。`}
-            confirmLabel="删除"
-            onConfirm={handleDelete}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              删除
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-          </ConfirmPopover>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => setDeleteDialogOpen(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              删除
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* 看法头部信息 */}
-      <div className="space-y-4 mb-8">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-2xl flex-shrink-0 mt-0.5">
-            {catConfig?.icon ?? '📁'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">{thesis.name}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              {thesis.asset && (
-                <Badge variant="secondary" className="text-xs font-mono font-normal gap-1">
-                  {thesis.asset}
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-xs font-normal gap-1">
-                {catConfig?.icon ?? '📁'} {catConfig?.label ?? thesis.category}
+      {/* ── Asset info ── */}
+      <div className="flex items-start gap-4 mb-8">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl flex-shrink-0">
+          {catConfig?.icon ?? '📁'}
+        </div>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <h1 className="text-xl font-bold tracking-tight leading-tight">{thesis.name}</h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {assetDisplayName && (
+              <Badge variant="secondary" className="text-xs font-normal gap-1">
+                {assetDisplayName}
               </Badge>
-              <span className="text-xs text-muted-foreground">
-                创建于{' '}
-                <span suppressHydrationWarning>
-                  {format(new Date(thesis.createdAt), 'yyyy/MM/dd', { locale: zhCN })}
-                </span>
+            )}
+            <Badge variant="outline" className="text-xs font-normal gap-1">
+              {catConfig?.icon ?? '📁'} {catConfig?.label ?? thesis.category}
+            </Badge>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <CalendarDays className="h-3 w-3" />
+              <span suppressHydrationWarning>
+                {format(new Date(thesis.createdAt), 'yyyy/MM/dd', { locale: zhCN })}
               </span>
+            </span>
+          </div>
+          {thesis.description && (
+            <p className="text-sm text-muted-foreground leading-relaxed pt-1">
+              {thesis.description}
+            </p>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-5 flex-shrink-0 pt-1">
+          <div className="flex flex-col items-center min-w-[60px]">
+            <p className="text-xs text-muted-foreground mb-1">快照</p>
+            <div className="inline-flex items-center gap-1.5 text-xl font-semibold">
+              <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+              {snapshotCount}
             </div>
           </div>
+
+          <Separator orientation="vertical" className="h-10" />
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex flex-col items-center min-w-[60px] cursor-default">
+                  <p className="text-xs text-muted-foreground mb-1">正确率</p>
+                  {accuracyRate !== null ? (
+                    <div className={cn(
+                      'inline-flex items-center gap-1.5 text-xl font-semibold',
+                      accuracyRate >= 60 ? 'text-emerald-500' : accuracyRate >= 40 ? 'text-amber-500' : 'text-rose-500'
+                    )}>
+                      <Target className="h-4 w-4" />
+                      {accuracyRate}%
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 text-xl font-semibold text-muted-foreground/40">
+                      <Target className="h-4 w-4" />
+                      —
+                    </div>
+                  )}
+                </div>
+              </TooltipTrigger>
+              {reviewedSnapshots.length > 0 && (
+                <TooltipContent side="bottom">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="flex items-center gap-1"><CircleCheck className="h-3 w-3 text-emerald-400" />正确 {correctCount}</span>
+                    <span className="flex items-center gap-1"><CircleX className="h-3 w-3 text-rose-400" />错误 {wrongCount}</span>
+                    <span className="flex items-center gap-1"><CircleMinus className="h-3 w-3 text-amber-400" />中立 {neutralCount}</span>
+                  </div>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
-
-        {thesis.description && (
-          <p className="text-sm text-muted-foreground leading-relaxed pl-[52px]">
-            {thesis.description}
-          </p>
-        )}
-
-        {/* 关联标签 */}
-        {thesis.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pl-[52px]">
-            {thesis.tags.map((tag) => (
-              <Badge
-                key={tag.id}
-                variant="outline"
-                className={cn(
-                  'text-xs font-normal',
-                  tag.category === 'buy'
-                    ? 'border-emerald-500/30 text-emerald-400'
-                    : 'border-rose-500/30 text-rose-400'
-                )}
-              >
-                {tag.label}
-              </Badge>
-            ))}
-          </div>
-        )}
       </div>
 
-      <Separator className="mb-8" />
+      <Separator className="mb-6" />
 
-      {/* 快照区 */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <h2 className="text-lg font-semibold">看法快照</h2>
-            <p className="text-xs text-muted-foreground">
-              在特定时间点记录你的判断，到期自动提醒回顾
-            </p>
-          </div>
-
-          <Dialog open={snapshotDialogOpen} onOpenChange={setSnapshotDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5">
-                <Camera className="h-3.5 w-3.5" />
-                添加快照
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[520px]">
-              <DialogHeader>
-                <DialogTitle>记录看法快照</DialogTitle>
-                <DialogDescription>
-                  记录你当前对「{thesis.name}」的判断和逻辑，并设定回顾时间。
-                </DialogDescription>
-              </DialogHeader>
-              <SnapshotForm thesisId={thesis.id} onSuccess={() => setSnapshotDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
+      {/* ── Snapshot section ── */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="space-y-0.5">
+          <h2 className="text-lg font-semibold">看法快照</h2>
+          <p className="text-xs text-muted-foreground">
+            在特定时间点记录你的判断，到期自动提醒回顾
+          </p>
         </div>
 
+        <Button
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setDrawerState({ mode: 'create' })}
+        >
+          <Camera className="h-3.5 w-3.5" />
+          添加快照
+        </Button>
+      </div>
+
+      <div className="pb-8">
         <SnapshotTimeline
           snapshots={thesis.snapshots}
-          thesisId={thesis.id}
+          selectedId={drawerState?.mode === 'view' ? drawerState.snapshotId : null}
+          onSelect={(snapshotId) => setDrawerState({ mode: 'view', snapshotId })}
           onAddFollowUp={(snapshotId, comment, verdict) =>
             addFollowUp(thesis.id, snapshotId, { comment, verdict })
           }
         />
       </div>
 
-      {/* 编辑看法 Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>编辑看法</DialogTitle>
-            <DialogDescription>修改看法的名称、描述和标签。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">名称</Label>
-              <Input
-                id="edit-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder="看法名称"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-desc">描述</Label>
-              <Textarea
-                id="edit-desc"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="简要描述你的投资看法..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>标签</Label>
-              <TagSelector selectedTags={editTags} onChange={setEditTags} />
-            </div>
+      {/* ── Drawer (overlay + panel) ── */}
+      {drawerOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 animate-in fade-in-0 duration-200"
+            onClick={closeDrawer}
+          />
+          <div className="fixed top-14 right-4 sm:right-6 md:right-8 bottom-2 z-40 w-[480px] rounded-xl border shadow-2xl bg-card animate-in slide-in-from-right duration-300 overflow-hidden">
+            <SnapshotDetailPanel
+              key={drawerState.mode === 'view' ? drawerState.snapshotId : '__create__'}
+              snapshot={selectedSnapshot}
+              thesisId={thesis.id}
+              onClose={closeDrawer}
+            />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+        </>
+      )}
+
+      {/* Delete thesis dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                <TriangleAlert className="h-4 w-4 text-destructive" />
+              </div>
+              删除看法
+            </DialogTitle>
+            <DialogDescription>
+              确认删除「{thesis.name}」？所有关联的快照也会被一并删除。此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleEditSave} disabled={!editName.trim()}>
-              保存
+            <Button variant="destructive" size="sm" onClick={handleDelete}>
+              删除
             </Button>
           </div>
         </DialogContent>

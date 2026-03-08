@@ -12,7 +12,7 @@ export interface ThesisTag {
 }
 
 /** 时间轴选项 */
-export type TimelineOption = '1D' | '1W' | '1M' | '1Q';
+export type TimelineOption = '1D' | '1W' | '1M' | '1Q' | 'custom';
 
 /** 回顾结论 */
 export type Verdict = 'correct' | 'wrong' | 'neutral';
@@ -31,10 +31,12 @@ export interface Snapshot {
   id: string;
   thesisId: string;
   content: string;
+  aiAnalysis: string;
   tags: ThesisTag[];
   timeline: TimelineOption;
   expectedReviewDate: string; // ISO date string
   createdAt: string;
+  updatedAt: string;
   /** 相关链接 */
   links: string[];
   /** 观点受谁影响 */

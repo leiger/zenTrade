@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from app import models
 
 from app.database import init_db
 from app.seed import seed_data
@@ -36,6 +38,37 @@ async def list_tags():
     try:
         rows = await fetchall(db, "SELECT * FROM tags ORDER BY category, id")
         return [{"id": r["id"], "label": r["label"], "category": r["category"]} for r in rows]
+    finally:
+        await db.close()
+
+
+@app.post("/api/tags", status_code=201)
+async def create_tag(body: models.TagCreate):
+    import uuid
+    from app.database import get_db, fetchall
+    db = await get_db()
+    try:
+        tag_id = f"{body.category}-{uuid.uuid4().hex[:8]}"
+        await db.execute(
+            "INSERT INTO tags (id, label, category) VALUES (?, ?, ?)",
+            (tag_id, body.label.strip(), body.category),
+        )
+        await db.commit()
+        return {"id": tag_id, "label": body.label.strip(), "category": body.category}
+    finally:
+        await db.close()
+
+
+@app.delete("/api/tags/{tag_id}", status_code=204)
+async def delete_tag(tag_id: str):
+    from app.database import get_db, fetchall
+    db = await get_db()
+    try:
+        rows = await fetchall(db, "SELECT id FROM tags WHERE id = ?", (tag_id,))
+        if not rows:
+            raise HTTPException(404, "Tag not found")
+        await db.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+        await db.commit()
     finally:
         await db.close()
 

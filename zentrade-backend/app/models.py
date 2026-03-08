@@ -13,6 +13,11 @@ class Tag(BaseModel):
     category: TagCategory
 
 
+class TagCreate(BaseModel):
+    label: str
+    category: TagCategory
+
+
 # ── FollowUp ─────────────────────────────────────────
 
 Verdict = Literal["correct", "wrong", "neutral"]
@@ -33,11 +38,12 @@ class FollowUp(BaseModel):
 
 # ── Snapshot ─────────────────────────────────────────
 
-TimelineOption = Literal["1D", "1W", "1M", "1Q"]
+TimelineOption = Literal["1D", "1W", "1M", "1Q", "custom"]
 
 
 class SnapshotCreate(BaseModel):
     content: str
+    ai_analysis: str = ""
     tags: list[str]  # tag ids
     timeline: TimelineOption
     expected_review_date: str
@@ -45,14 +51,26 @@ class SnapshotCreate(BaseModel):
     influenced_by: str = ""
 
 
+class SnapshotUpdate(BaseModel):
+    content: Optional[str] = None
+    ai_analysis: Optional[str] = None
+    tags: Optional[list[str]] = None
+    timeline: Optional[TimelineOption] = None
+    expected_review_date: Optional[str] = None
+    links: Optional[list[str]] = None
+    influenced_by: Optional[str] = None
+
+
 class Snapshot(BaseModel):
     id: str
     thesis_id: str
     content: str
+    ai_analysis: str = ""
     tags: list[Tag] = []
     timeline: TimelineOption
     expected_review_date: str
     created_at: str
+    updated_at: str = ""
     links: list[str] = []
     influenced_by: str = ""
     follow_up: Optional[FollowUp] = None
