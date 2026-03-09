@@ -4,6 +4,9 @@ export type AssetCategory = 'crypto' | 'us-stock' | 'a-stock' | 'hk-stock' | 'bo
 /** 标签类别 */
 export type TagCategory = 'buy' | 'sell';
 
+/** Thesis lifecycle */
+export type ThesisStatus = 'active' | 'paused' | 'archived' | 'invalidated';
+
 /** 预设标签 */
 export interface ThesisTag {
   id: string;
@@ -51,6 +54,7 @@ export interface Thesis {
   name: string;
   category: AssetCategory;
   asset: string; // asset symbol, e.g. "BTC", "AAPL", or empty if only category selected
+  status: ThesisStatus;
   description: string;
   tags: ThesisTag[];
   snapshots: Snapshot[];

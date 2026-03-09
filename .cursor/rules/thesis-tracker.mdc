@@ -1,0 +1,20 @@
+---
+description: Thesis Tracker product and UI conventions
+globs: zentrade-app/src/{app/{thesis,review,analytics}/**/*.tsx,components/modules/thesis-tracker/**/*.tsx,components/shared/{ReminderBell,Sidebar,DynamicBreadcrumb}.tsx,lib/thesis-tracker.ts,lib/{api,store}.ts,types/thesis.ts}
+alwaysApply: false
+---
+
+# Thesis Tracker
+
+- Preserve the core loop: `Thesis -> Snapshot -> FollowUp`. New work should strengthen capture, review, or analysis, not bypass it.
+- Treat `/thesis`, `/review`, and `/analytics` as one product surface. When adding a feature, consider whether it also needs an inbox entry, analytics visibility, or thesis-level summary.
+- Reuse shared tracker logic in `src/lib/thesis-tracker.ts` for review buckets, accuracy, tag aggregation, and influence analytics. Do not duplicate stats logic inside pages.
+- Keep thesis lifecycle explicit. Use existing statuses: `active`, `paused`, `archived`, `invalidated`.
+- Review-related UI should always handle 3 states clearly: pending, overdue, reviewed.
+- Search and filter additions should be practical first: status, review state, tags, time range, asset/name. Prefer consistent filter vocabulary across list, detail, and review inbox.
+- Snapshot detail should favor readability over density. Optional metadata such as AI analysis, links, and influence sources should remain visually secondary to the user's thesis text.
+- For large timelines or inbox lists, design for scale: empty states, filtered-empty states, truncation, and progressive disclosure.
+- Analytics additions should answer a behavior question, such as which category, tag, timeline, or influence source performs better.
+- Keep reminder UX lightweight and useful: badge counts, inbox grouping, and quick actions like postpone or follow-up are preferred over noisy visual effects.
+- Follow existing Shadcn accessibility basics: icon-only buttons need `aria-label`, searchable inputs need `name` and `aria-label`, and empty states should explain the next action.
+- Comments, if needed, should be brief and in English.

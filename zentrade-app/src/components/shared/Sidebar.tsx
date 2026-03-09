@@ -3,8 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings, Inbox } from 'lucide-react';
 import { ModeToggle } from '@/components/shared/ModeToggle';
+import { useThesisStore } from '@/lib/store';
+import { getReminderSummary } from '@/lib/thesis-tracker';
 import {
   Sidebar,
   SidebarContent,
@@ -27,8 +29,9 @@ const navigation = [
     label: '核心功能',
     items: [
       { name: 'Thesis Tracker', href: '/thesis', icon: BrainCircuit, disabled: false },
+      { name: 'Review Inbox', href: '/review', icon: Inbox, disabled: false },
       { name: 'Decision Firewall', href: '/firewall', icon: Shield, disabled: true },
-      { name: 'Analytics', href: '/analytics', icon: BarChart3, disabled: true },
+      { name: 'Analytics', href: '/analytics', icon: BarChart3, disabled: false },
     ],
   },
   {
@@ -39,6 +42,18 @@ const navigation = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const theses = useThesisStore((state) => state.theses);
+  const fetchTheses = useThesisStore((state) => state.fetchTheses);
+  const pendingReviewCount = React.useMemo(
+    () => getReminderSummary(theses).pending.length,
+    [theses]
+  );
+
+  React.useEffect(() => {
+    if (theses.length === 0) {
+      fetchTheses();
+    }
+  }, [fetchTheses, theses.length]);
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -77,7 +92,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
-                    {item.disabled && <SidebarMenuBadge>Soon</SidebarMenuBadge>}
+                    {item.name === 'Review Inbox' && pendingReviewCount > 0 ? (
+                      <SidebarMenuBadge>{pendingReviewCount}</SidebarMenuBadge>
+                    ) : item.disabled ? (
+                      <SidebarMenuBadge>Soon</SidebarMenuBadge>
+                    ) : null}
                   </SidebarMenuItem>
                 );
               })}

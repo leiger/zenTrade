@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Thesis, Snapshot, ThesisTag, Verdict } from '@/types/thesis';
+import { Thesis, Snapshot, Verdict, ThesisStatus } from '@/types/thesis';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import type { TimelineOption } from '@/types/thesis';
 import * as api from './api';
@@ -24,10 +24,10 @@ interface ThesisStore {
   theses: Thesis[];
   loading: boolean;
   fetchTheses: () => Promise<void>;
-  addThesis: (thesis: Pick<Thesis, 'name' | 'category' | 'asset'>) => Promise<void>;
+  addThesis: (thesis: Pick<Thesis, 'name' | 'category' | 'asset'> & { status?: ThesisStatus }) => Promise<void>;
   updateThesis: (
     id: string,
-    updates: Partial<Pick<Thesis, 'name' | 'description' | 'tags'>>
+    updates: Partial<Pick<Thesis, 'name' | 'description' | 'tags' | 'status'>>
   ) => Promise<void>;
   deleteThesis: (id: string) => Promise<void>;
   addSnapshot: (
@@ -80,6 +80,7 @@ export const useThesisStore = create<ThesisStore>((set) => ({
         name: thesis.name,
         category: thesis.category,
         asset: thesis.asset,
+        status: thesis.status,
       });
       const theses = await api.fetchTheses();
       set({ theses });
@@ -90,10 +91,11 @@ export const useThesisStore = create<ThesisStore>((set) => ({
 
   updateThesis: async (id, updates) => {
     try {
-      const payload: { name?: string; description?: string; tags?: string[] } = {};
+      const payload: { name?: string; description?: string; tags?: string[]; status?: ThesisStatus } = {};
       if (updates.name !== undefined) payload.name = updates.name;
       if (updates.description !== undefined) payload.description = updates.description;
       if (updates.tags !== undefined) payload.tags = updates.tags.map((t) => t.id);
+      if (updates.status !== undefined) payload.status = updates.status;
 
       const updated = await api.updateThesis(id, payload);
       set((state) => ({

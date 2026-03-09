@@ -79,18 +79,21 @@ class Snapshot(BaseModel):
 # ── Thesis ───────────────────────────────────────────
 
 AssetCategory = Literal["crypto", "us-stock", "a-stock", "hk-stock", "bond", "commodity"]
+ThesisStatus = Literal["active", "paused", "archived", "invalidated"]
 
 
 class ThesisCreate(BaseModel):
     name: str
     category: AssetCategory
     asset: str = ""
+    status: ThesisStatus = "active"
 
 
 class ThesisUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[list[str]] = None  # tag ids
+    status: Optional[ThesisStatus] = None
 
 
 class ThesisReorder(BaseModel):
@@ -102,6 +105,7 @@ class Thesis(BaseModel):
     name: str
     category: AssetCategory
     asset: str
+    status: ThesisStatus = "active"
     description: str
     tags: list[Tag] = []
     snapshots: list[Snapshot] = []

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useThesisStore } from '@/lib/store';
+import { getReminderSummary } from '@/lib/thesis-tracker';
 import { ThesisTable } from '@/components/modules/thesis-tracker/ThesisTable';
 import { ThesisForm } from '@/components/modules/thesis-tracker/ThesisForm';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, BrainCircuit, Activity, Camera, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, BrainCircuit, Activity, Camera, Clock, Inbox } from 'lucide-react';
 
 export default function ThesisPage() {
   const theses = useThesisStore((s) => s.theses);
@@ -24,11 +26,15 @@ export default function ThesisPage() {
     fetchTheses();
   }, [fetchTheses]);
 
-  const pendingReviewCount = theses.reduce(
-    (acc, t) =>
-      acc + t.snapshots.filter((s) => new Date(s.expectedReviewDate) < new Date()).length,
-    0
-  );
+  const pendingReviewCount = getReminderSummary(theses).pending.length;
+
+  if (loading && theses.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -40,9 +46,15 @@ export default function ThesisPage() {
             <h1 className="text-2xl font-bold tracking-tight">Thesis Tracker</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            记录投资逻辑，追踪认知偏差，实现"预测-执行-复盘"闭环
+            记录投资逻辑，追踪认知偏差，实现“预测-执行-复盘”闭环
           </p>
         </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link href="/review">
+            <Inbox className="h-3.5 w-3.5" />
+            Review Inbox
+          </Link>
+        </Button>
       </div>
 
       {/* 统计栏 */}

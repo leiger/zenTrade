@@ -15,6 +15,7 @@ import {
 
 const routeLabels: Record<string, string> = {
   '/thesis': 'Thesis Tracker',
+  '/review': 'Review Inbox',
   '/firewall': 'Decision Firewall',
   '/analytics': 'Analytics',
   '/settings': 'Settings',

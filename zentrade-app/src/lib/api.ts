@@ -1,4 +1,4 @@
-import type { Thesis, Snapshot, FollowUp, ThesisTag, Verdict } from '@/types/thesis';
+import type { Thesis, Snapshot, FollowUp, ThesisTag, Verdict, ThesisStatus } from '@/types/thesis';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -61,6 +61,7 @@ function mapThesis(raw: Record<string, unknown>): Thesis {
     name: raw.name as string,
     category: raw.category as Thesis['category'],
     asset: raw.asset as string,
+    status: (raw.status as ThesisStatus) || 'active',
     description: raw.description as string,
     tags: ((raw.tags as Record<string, string>[]) || []).map(mapTag),
     snapshots: ((raw.snapshots as Record<string, unknown>[]) || []).map(mapSnapshot),
@@ -81,7 +82,7 @@ export async function fetchThesis(id: string): Promise<Thesis> {
   return mapThesis(raw);
 }
 
-export async function createThesis(data: { name: string; category: string; asset: string }): Promise<Thesis> {
+export async function createThesis(data: { name: string; category: string; asset: string; status?: ThesisStatus }): Promise<Thesis> {
   const raw = await request<Record<string, unknown>>('/theses', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -91,7 +92,7 @@ export async function createThesis(data: { name: string; category: string; asset
 
 export async function updateThesis(
   id: string,
-  updates: { name?: string; description?: string; tags?: string[] }
+  updates: { name?: string; description?: string; tags?: string[]; status?: ThesisStatus }
 ): Promise<Thesis> {
   const raw = await request<Record<string, unknown>>(`/theses/${id}`, {
     method: 'PATCH',

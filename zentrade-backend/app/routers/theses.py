@@ -94,7 +94,7 @@ async def _build_thesis(db, row) -> Thesis:
     tid = row["id"]
     return Thesis(
         id=tid, name=row["name"], category=row["category"],
-        asset=row["asset"], description=row["description"],
+        asset=row["asset"], status=row["status"] or "active", description=row["description"],
         tags=await _load_thesis_tags(db, tid),
         snapshots=await _load_snapshots(db, tid),
         created_at=row["created_at"], updated_at=row["updated_at"],
@@ -138,9 +138,9 @@ async def create_thesis(body: ThesisCreate):
         max_order = await fetchall(db, "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM theses")
         order = max_order[0]["next_order"]
         await db.execute(
-            "INSERT INTO theses (id, name, category, asset, description, sort_order, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, '', ?, ?, ?)",
-            (tid, body.name, body.category, body.asset, order, now, now),
+            "INSERT INTO theses (id, name, category, asset, status, description, sort_order, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)",
+            (tid, body.name, body.category, body.asset, body.status, order, now, now),
         )
         await db.commit()
         rows = await fetchall(db,"SELECT * FROM theses WHERE id = ?", (tid,))
@@ -166,6 +166,9 @@ async def update_thesis(thesis_id: str, body: ThesisUpdate):
         if body.description is not None:
             sets.append("description = ?")
             params.append(body.description)
+        if body.status is not None:
+            sets.append("status = ?")
+            params.append(body.status)
 
         now = _now_iso()
         sets.append("updated_at = ?")

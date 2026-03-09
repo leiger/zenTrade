@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS theses (
     name        TEXT NOT NULL,
     category    TEXT NOT NULL CHECK(category IN ('crypto','us-stock','a-stock','hk-stock','bond','commodity')),
     asset       TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused','archived','invalidated')),
     description TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
@@ -89,6 +90,18 @@ async def get_db() -> aiosqlite.Connection:
 
 async def _migrate(db: aiosqlite.Connection):
     """Run schema migrations for existing databases."""
+    thesis_cursor = await db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='theses'"
+    )
+    thesis_row = await thesis_cursor.fetchone()
+    thesis_schema_sql = str(thesis_row[0]) if thesis_row else ""
+
+    if thesis_schema_sql and "status" not in thesis_schema_sql:
+        await db.execute(
+            "ALTER TABLE theses ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+        )
+        await db.commit()
+
     cursor = await db.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='snapshots'"
     )

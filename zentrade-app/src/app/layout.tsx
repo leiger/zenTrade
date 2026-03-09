@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AppSidebar } from '@/components/shared/Sidebar';
 import { DynamicBreadcrumb } from '@/components/shared/DynamicBreadcrumb';
+import { ReminderBell } from '@/components/shared/ReminderBell';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
@@ -30,7 +31,10 @@ export default function RootLayout({
               <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
-                <DynamicBreadcrumb />
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <DynamicBreadcrumb />
+                  <ReminderBell />
+                </div>
               </header>
               <main className="flex-1 overflow-auto bg-background p-4 sm:p-6 md:p-8">
                 {children}
