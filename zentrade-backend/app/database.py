@@ -59,6 +59,75 @@ CREATE TABLE IF NOT EXISTS follow_ups (
     verdict     TEXT NOT NULL CHECK(verdict IN ('correct','wrong','neutral')),
     created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id                 TEXT PRIMARY KEY,
+    name               TEXT NOT NULL,
+    type               TEXT NOT NULL CHECK(type IN ('wallet','exchange','broker','bank','manual')),
+    broker_or_platform TEXT NOT NULL DEFAULT '',
+    base_currency      TEXT NOT NULL DEFAULT 'USD',
+    notes              TEXT NOT NULL DEFAULT '',
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS assets (
+    id             TEXT PRIMARY KEY,
+    symbol         TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    category       TEXT NOT NULL CHECK(category IN ('crypto','us-stock','a-stock','hk-stock','bond','commodity')),
+    market         TEXT NOT NULL DEFAULT '',
+    quote_currency TEXT NOT NULL DEFAULT 'USD',
+    price_source   TEXT NOT NULL DEFAULT 'manual' CHECK(price_source IN ('coingecko','twelve_data','manual','derived')),
+    metadata_json  TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    UNIQUE(symbol, category)
+);
+
+CREATE TABLE IF NOT EXISTS holdings (
+    id            TEXT PRIMARY KEY,
+    account_id    TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    asset_id      TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    quantity      REAL NOT NULL DEFAULT 0,
+    avg_cost      REAL NOT NULL DEFAULT 0,
+    cost_currency TEXT NOT NULL DEFAULT 'USD',
+    status        TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed','archived')),
+    opened_at     TEXT NOT NULL,
+    closed_at     TEXT NOT NULL DEFAULT '',
+    notes         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS adjustments (
+    id                TEXT PRIMARY KEY,
+    holding_id        TEXT NOT NULL REFERENCES holdings(id) ON DELETE CASCADE,
+    account_id        TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    asset_id          TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    type              TEXT NOT NULL CHECK(type IN ('buy','sell','transfer_in','transfer_out','airdrop','dividend_reinvest','manual_add','manual_reduce')),
+    quantity_delta    REAL NOT NULL,
+    unit_price        REAL NOT NULL DEFAULT 0,
+    fee               REAL NOT NULL DEFAULT 0,
+    fee_currency      TEXT NOT NULL DEFAULT 'USD',
+    executed_at       TEXT NOT NULL,
+    notes             TEXT NOT NULL DEFAULT '',
+    related_thesis_id TEXT,
+    created_at        TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS valuation_snapshots (
+    id               TEXT PRIMARY KEY,
+    scope_type       TEXT NOT NULL CHECK(scope_type IN ('holding','portfolio')),
+    scope_id         TEXT NOT NULL,
+    quantity         REAL NOT NULL DEFAULT 0,
+    market_price     REAL NOT NULL DEFAULT 0,
+    market_value_usd REAL NOT NULL DEFAULT 0,
+    fx_rate_to_usd   REAL NOT NULL DEFAULT 1,
+    source           TEXT NOT NULL DEFAULT 'derived' CHECK(source IN ('coingecko','twelve_data','manual','derived')),
+    as_of            TEXT NOT NULL,
+    created_at       TEXT NOT NULL
+);
 """
 
 SEED_TAGS = """
@@ -90,6 +159,74 @@ async def get_db() -> aiosqlite.Connection:
 
 async def _migrate(db: aiosqlite.Connection):
     """Run schema migrations for existing databases."""
+    await db.executescript("""
+        CREATE TABLE IF NOT EXISTS accounts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('wallet','exchange','broker','bank','manual')),
+            broker_or_platform TEXT NOT NULL DEFAULT '',
+            base_currency TEXT NOT NULL DEFAULT 'USD',
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS assets (
+            id TEXT PRIMARY KEY,
+            symbol TEXT NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL CHECK(category IN ('crypto','us-stock','a-stock','hk-stock','bond','commodity')),
+            market TEXT NOT NULL DEFAULT '',
+            quote_currency TEXT NOT NULL DEFAULT 'USD',
+            price_source TEXT NOT NULL DEFAULT 'manual' CHECK(price_source IN ('coingecko','twelve_data','manual','derived')),
+            metadata_json TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(symbol, category)
+        );
+        CREATE TABLE IF NOT EXISTS holdings (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+            quantity REAL NOT NULL DEFAULT 0,
+            avg_cost REAL NOT NULL DEFAULT 0,
+            cost_currency TEXT NOT NULL DEFAULT 'USD',
+            status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed','archived')),
+            opened_at TEXT NOT NULL,
+            closed_at TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS adjustments (
+            id TEXT PRIMARY KEY,
+            holding_id TEXT NOT NULL REFERENCES holdings(id) ON DELETE CASCADE,
+            account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+            type TEXT NOT NULL CHECK(type IN ('buy','sell','transfer_in','transfer_out','airdrop','dividend_reinvest','manual_add','manual_reduce')),
+            quantity_delta REAL NOT NULL,
+            unit_price REAL NOT NULL DEFAULT 0,
+            fee REAL NOT NULL DEFAULT 0,
+            fee_currency TEXT NOT NULL DEFAULT 'USD',
+            executed_at TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            related_thesis_id TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS valuation_snapshots (
+            id TEXT PRIMARY KEY,
+            scope_type TEXT NOT NULL CHECK(scope_type IN ('holding','portfolio')),
+            scope_id TEXT NOT NULL,
+            quantity REAL NOT NULL DEFAULT 0,
+            market_price REAL NOT NULL DEFAULT 0,
+            market_value_usd REAL NOT NULL DEFAULT 0,
+            fx_rate_to_usd REAL NOT NULL DEFAULT 1,
+            source TEXT NOT NULL DEFAULT 'derived' CHECK(source IN ('coingecko','twelve_data','manual','derived')),
+            as_of TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+    await db.commit()
+
     thesis_cursor = await db.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='theses'"
     )

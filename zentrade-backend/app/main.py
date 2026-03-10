@@ -6,7 +6,7 @@ from app import models
 
 from app.database import init_db
 from app.seed import seed_data
-from app.routers import theses, snapshots, follow_ups
+from app.routers import theses, snapshots, follow_ups, accounts, assets, holdings, adjustments, market_data
 
 
 @asynccontextmanager
@@ -29,6 +29,11 @@ app.add_middleware(
 app.include_router(theses.router, prefix="/api")
 app.include_router(snapshots.router, prefix="/api")
 app.include_router(follow_ups.router, prefix="/api")
+app.include_router(accounts.router, prefix="/api")
+app.include_router(assets.router, prefix="/api")
+app.include_router(holdings.router, prefix="/api")
+app.include_router(adjustments.router, prefix="/api")
+app.include_router(market_data.router, prefix="/api")
 
 
 @app.get("/api/tags")

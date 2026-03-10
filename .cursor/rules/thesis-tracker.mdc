@@ -1,6 +1,6 @@
 ---
-description: Thesis Tracker product and UI conventions
-globs: zentrade-app/src/{app/{thesis,review,analytics}/**/*.tsx,components/modules/thesis-tracker/**/*.tsx,components/shared/{ReminderBell,Sidebar,DynamicBreadcrumb}.tsx,lib/thesis-tracker.ts,lib/{api,store}.ts,types/thesis.ts}
+description: Thesis Tracker product conventions
+globs: {zentrade-app/src/{app/{thesis,review,analytics}/**/*.tsx,components/modules/thesis-tracker/**/*.tsx,components/shared/{ReminderBell,Sidebar,DynamicBreadcrumb}.tsx,lib/{api,store,thesis-tracker}.ts,types/thesis.ts},zentrade-backend/app/{models.py,database.py,seed.py,routers/{theses,snapshots,follow_ups}.py}}
 alwaysApply: false
 ---
 

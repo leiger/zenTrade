@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/breadcrumb';
 
 const routeLabels: Record<string, string> = {
+  '/assets': 'Assets',
   '/thesis': 'Thesis Tracker',
   '/review': 'Review Inbox',
   '/firewall': 'Decision Firewall',
@@ -34,6 +35,10 @@ export function DynamicBreadcrumb() {
 
     if (segments.length > 1) {
       crumbs.push({ label: baseLabel, href: basePath });
+
+      if (segments[0] === 'assets' && segments[2]) {
+        crumbs.push({ label: segments[2] });
+      }
 
       if (segments[0] === 'thesis' && segments[1]) {
         const thesis = theses.find((t) => t.id === segments[1]);

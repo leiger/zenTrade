@@ -1,0 +1,21 @@
+---
+description: Assets module product conventions
+globs: {zentrade-app/src/{app/assets/**/*.tsx,components/modules/assets/**/*.tsx,components/shared/{Sidebar,DynamicBreadcrumb}.tsx,lib/{api,assets}.ts,types/portfolio.ts},zentrade-backend/app/{models.py,database.py,seed.py,portfolio_utils.py,routers/{accounts,assets,holdings,adjustments,market_data}.py,price_providers/**/*.py}}
+alwaysApply: false
+---
+
+# Assets Module
+
+- The assets module manages real positions, not opinions. Keep `Asset -> Holding -> Adjustment -> ValuationSnapshot` responsibilities explicit.
+- Users input `quantity`, not current market value. Market value should come from quote data or derived valuation logic.
+- Keep `AdjustmentEvent` and `ValuationSnapshot` separate: adjustments explain quantity changes; valuation snapshots explain historical value.
+- `Adjustment / Entry` should stay embedded in `holdings list` or `asset detail`, not expanded into a separate full page unless workflow complexity clearly requires it.
+- USD is the default base currency in v1, while each asset must still preserve its source quote currency.
+- Multi-account support is first-class. Holdings remain account-scoped, and asset detail should show account breakdown before aggregate conclusions.
+- Reuse shared helpers in `src/lib/assets.ts` and backend aggregation in `app/portfolio_utils.py`. Do not duplicate valuation, pnl, allocation, or chart-prep logic in pages or routers.
+- Backend market data must go through provider adapters. Keep provider-specific logic inside `app/price_providers/*`, not inside pages or generic routers.
+- When live market data is unavailable, prefer graceful fallback or stale-data indicators instead of breaking the dashboard.
+- Dashboard and detail views should prioritize allocation, holdings composition, account breakdown, and recent adjustments over decorative chart density.
+- Search and filters should stay practical first: category, account, symbol/name, status, and time range.
+- Follow existing Shadcn accessibility basics: icon-only buttons need `aria-label`, searchable inputs need `name` and `aria-label`, and empty states should explain the next action.
+- Comments, if needed, should be brief and in English.

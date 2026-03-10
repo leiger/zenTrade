@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings, Inbox } from 'lucide-react';
+import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings, Inbox, Wallet } from 'lucide-react';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { useThesisStore } from '@/lib/store';
 import { getReminderSummary } from '@/lib/thesis-tracker';
@@ -28,6 +28,7 @@ const navigation = [
   {
     label: '核心功能',
     items: [
+      { name: 'Assets', href: '/assets', icon: Wallet, disabled: false },
       { name: 'Thesis Tracker', href: '/thesis', icon: BrainCircuit, disabled: false },
       { name: 'Review Inbox', href: '/review', icon: Inbox, disabled: false },
       { name: 'Decision Firewall', href: '/firewall', icon: Shield, disabled: true },
