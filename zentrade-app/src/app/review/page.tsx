@@ -35,6 +35,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 const REVIEW_BUCKETS: Array<{ value: ReviewBucket; label: string }> = [
@@ -171,10 +178,28 @@ export default function ReviewPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <SummaryCard label="已逾期" value={reminders.overdue.length} accent="text-rose-500" />
-        <SummaryCard label="今天到期" value={reminders.today.length} accent="text-amber-500" />
-        <SummaryCard label="即将到期" value={reminders.upcoming.length} accent="text-sky-500" />
+      <div className="*:data-[slot=card]:shadow-xs grid grid-cols-1 gap-3 sm:grid-cols-3 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
+        <SummaryCard
+          label="已逾期"
+          value={reminders.overdue.length}
+          accent="text-rose-500"
+          footer="需要立即处理"
+          icon={CalendarClock}
+        />
+        <SummaryCard
+          label="今天到期"
+          value={reminders.today.length}
+          accent="text-amber-500"
+          footer="今日待复盘快照"
+          icon={CalendarClock}
+        />
+        <SummaryCard
+          label="即将到期"
+          value={reminders.upcoming.length}
+          accent="text-sky-500"
+          footer="未来 7 天内到期"
+          icon={CalendarClock}
+        />
       </div>
 
       <div className="rounded-xl border bg-background/70 p-4 shadow-sm">
@@ -403,15 +428,27 @@ function SummaryCard({
   label,
   value,
   accent,
+  footer,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   accent: string;
+  footer: string;
+  icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-xl border bg-background/70 px-4 py-3 shadow-sm">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-2xl font-semibold tabular-nums', accent)}>{value}</p>
-    </div>
+    <Card className="py-3 gap-2">
+      <CardHeader className="px-4 gap-1">
+        <CardDescription className="text-xs">{label}</CardDescription>
+        <CardTitle className={cn('text-xl font-semibold tabular-nums', accent)}>
+          {value}
+        </CardTitle>
+      </CardHeader>
+      <CardFooter className="px-4 text-xs text-muted-foreground">
+        <Icon className="size-3.5" />
+        {footer}
+      </CardFooter>
+    </Card>
   );
 }

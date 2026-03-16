@@ -15,6 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import Link from 'next/link';
 import { Plus, BrainCircuit, Activity, Camera, Clock, Inbox } from 'lucide-react';
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 export default function ThesisPage() {
   const theses = useThesisStore((s) => s.theses);
@@ -58,38 +65,45 @@ export default function ThesisPage() {
       </div>
 
       {/* 统计栏 */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="flex items-center gap-3 rounded-lg border px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/10">
-            <Clock className="h-4 w-4 text-amber-500" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">待回顾</p>
-            <p className="text-lg font-semibold text-amber-500">{pendingReviewCount}</p>
-          </div>
-        </div>
+      <div className="*:data-[slot=card]:shadow-xs grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
+        <Card className="py-3 gap-2">
+          <CardHeader className="px-4 gap-1">
+            <CardDescription className="text-xs">待回顾</CardDescription>
+            <CardTitle className="text-xl font-semibold tabular-nums text-amber-500">
+              {pendingReviewCount}
+            </CardTitle>
+          </CardHeader>
+          <CardFooter className="px-4 text-xs text-muted-foreground">
+            <Clock className="size-3.5" />
+            需要及时复盘处理
+          </CardFooter>
+        </Card>
 
-        <div className="flex items-center gap-3 rounded-lg border px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-            <Activity className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">活跃看法</p>
-            <p className="text-lg font-semibold">{theses.length}</p>
-          </div>
-        </div>
+        <Card className="py-3 gap-2">
+          <CardHeader className="px-4 gap-1">
+            <CardDescription className="text-xs">活跃看法</CardDescription>
+            <CardTitle className="text-xl font-semibold tabular-nums">
+              {theses.length}
+            </CardTitle>
+          </CardHeader>
+          <CardFooter className="px-4 text-xs text-muted-foreground">
+            <Activity className="size-3.5" />
+            当前追踪中的投资看法
+          </CardFooter>
+        </Card>
 
-        <div className="flex items-center gap-3 rounded-lg border px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-            <Camera className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">总快照数</p>
-            <p className="text-lg font-semibold">
+        <Card className="py-3 gap-2">
+          <CardHeader className="px-4 gap-1">
+            <CardDescription className="text-xs">总快照数</CardDescription>
+            <CardTitle className="text-xl font-semibold tabular-nums">
               {theses.reduce((acc, t) => acc + t.snapshots.length, 0)}
-            </p>
-          </div>
-        </div>
+            </CardTitle>
+          </CardHeader>
+          <CardFooter className="px-4 text-xs text-muted-foreground">
+            <Camera className="size-3.5" />
+            累计记录的认知快照
+          </CardFooter>
+        </Card>
       </div>
 
       {/* 看法列表 */}
