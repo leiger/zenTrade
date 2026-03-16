@@ -1,0 +1,51 @@
+services:
+  backend:
+    build: ./zentrade-backend
+    restart: unless-stopped
+    volumes:
+      - db-data:/data
+    environment:
+      - DB_PATH=/data/zentrade.db
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
+      - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./zentrade-app
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+
+volumes:
+  db-data:
+  certbot-conf:
+  certbot-www:

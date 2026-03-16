@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,9 @@ from app import models
 from app.database import init_db
 from app.seed import seed_data
 from app.routers import theses, snapshots, follow_ups, accounts, assets, holdings, adjustments, market_data
+
+_cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+CORS_ORIGINS = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 
 
 @asynccontextmanager
@@ -20,7 +24,7 @@ app = FastAPI(title="ZenTrade Thesis Tracker API", version="0.1.0", lifespan=lif
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

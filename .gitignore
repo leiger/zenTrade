@@ -40,6 +40,10 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.production.example
+
+# generated nginx conf (from template)
+deploy/nginx.conf
 
 # vercel
 .vercel
