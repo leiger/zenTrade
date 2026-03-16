@@ -37,7 +37,7 @@ export default function ThesisPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       {/* 页头 */}
       <div className="flex items-center justify-between mb-6">
         <div className="space-y-1">

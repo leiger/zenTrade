@@ -32,7 +32,7 @@ export default function AnalyticsPage() {
   const influenceAnalytics = useMemo(() => getInfluenceAnalytics(theses), [theses]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
           <BarChart3 className="h-6 w-6 text-primary" />
