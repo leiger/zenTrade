@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
           <BarChart3 className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-oswald">Analytics</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           从 thesis、标签、时间跨度与影响来源几个维度复盘你的判断质量。
@@ -189,7 +189,7 @@ function MetricCard({
         <p className="text-xs text-muted-foreground">{label}</p>
         <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
-      <p className={`mt-2 text-2xl font-semibold tabular-nums ${accent ?? ''}`}>{value}</p>
+      <p className={`mt-2 text-3xl font-oswald tabular-nums tracking-wide ${accent ?? ''}`}>{value}</p>
     </div>
   );
 }

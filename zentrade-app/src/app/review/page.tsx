@@ -160,7 +160,7 @@ export default function ReviewPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <Inbox className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">Review Inbox</h1>
+            <h1 className="text-2xl font-bold tracking-tight font-oswald">Review Inbox</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             集中处理所有待回顾快照，避免 thesis 分散后遗漏复盘。
@@ -411,7 +411,7 @@ function SummaryCard({
   return (
     <div className="rounded-xl border bg-gradient-to-t from-primary/5 to-card px-4 py-3 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-2xl font-semibold tabular-nums', accent)}>{value}</p>
+      <p className={cn('mt-1 text-3xl font-oswald tabular-nums tracking-wide', accent)}>{value}</p>
     </div>
   );
 }

@@ -60,11 +60,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
         <div className="flex items-center gap-2.5 px-2 py-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-bebas-neue text-sm">
             Z
           </div>
           <div className="flex flex-col gap-0.5 leading-none">
-            <span className="font-semibold text-sm">ZenTrade</span>
+            <span className="font-bebas-neue text-base tracking-wide">ZenTrade</span>
             <span className="text-[10px] text-muted-foreground">认知交易系统</span>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       tooltip={item.name}
                       disabled={item.disabled}
                     >
-                      <Link href={item.disabled ? '#' : item.href}>
+                      <Link href={item.disabled ? '#' : item.href} className="font-oswald tracking-wide">
                         <Icon />
                         <span>{item.name}</span>
                       </Link>

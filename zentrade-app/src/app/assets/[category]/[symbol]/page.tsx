@@ -92,7 +92,7 @@ export default function AssetDetailPage() {
               </Link>
             </Button>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{detail.asset.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight font-oswald">{detail.asset.name}</h1>
               <Badge variant="secondary" className="font-mono font-normal">
                 {detail.asset.symbol}
               </Badge>
@@ -143,7 +143,7 @@ export default function AssetDetailPage() {
             <CardContent className="space-y-4">
               <div className="rounded-lg border px-4 py-3">
                 <p className="text-xs text-muted-foreground">当前市值</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{formatUsd(detail.asset.marketValueUsd)}</p>
+                <p className="mt-1 text-3xl font-oswald tabular-nums tracking-wide">{formatUsd(detail.asset.marketValueUsd)}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <MetricBlock label="未实现盈亏" value={formatUsd(detail.asset.unrealizedPnlUsd)} tone={getPnlTone(detail.asset.unrealizedPnlUsd)} />

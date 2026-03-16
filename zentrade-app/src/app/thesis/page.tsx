@@ -43,7 +43,7 @@ export default function ThesisPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <BrainCircuit className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">Thesis Tracker</h1>
+            <h1 className="text-2xl font-bold tracking-tight font-oswald">Thesis Tracker</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             记录投资逻辑，追踪认知偏差，实现“预测-执行-复盘”闭环
@@ -65,7 +65,7 @@ export default function ThesisPage() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">待回顾</p>
-            <p className="text-lg font-semibold text-amber-500">{pendingReviewCount}</p>
+            <p className="text-2xl font-oswald tracking-wide text-amber-500">{pendingReviewCount}</p>
           </div>
         </div>
 
@@ -75,7 +75,7 @@ export default function ThesisPage() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">活跃看法</p>
-            <p className="text-lg font-semibold">{theses.length}</p>
+            <p className="text-2xl font-oswald tracking-wide">{theses.length}</p>
           </div>
         </div>
 
@@ -85,7 +85,7 @@ export default function ThesisPage() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">总快照数</p>
-            <p className="text-lg font-semibold">
+            <p className="text-2xl font-oswald tracking-wide">
               {theses.reduce((acc, t) => acc + t.snapshots.length, 0)}
             </p>
           </div>

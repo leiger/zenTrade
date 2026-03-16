@@ -51,7 +51,7 @@ export function DynamicBreadcrumb() {
 
   return (
     <Breadcrumb>
-      <BreadcrumbList>
+      <BreadcrumbList className="font-oswald tracking-wide">
         <BreadcrumbItem className="hidden md:block">
           <BreadcrumbLink asChild>
             <Link href="/thesis">ZenTrade</Link>

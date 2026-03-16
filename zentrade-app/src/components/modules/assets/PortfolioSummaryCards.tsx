@@ -52,7 +52,7 @@ export function PortfolioSummaryCards({ summary }: PortfolioSummaryCardsProps) {
               <Icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-1">
-              <p className={`text-2xl font-semibold tabular-nums ${item.tone}`}>{item.value}</p>
+              <p className={`text-3xl font-oswald tabular-nums tracking-wide ${item.tone}`}>{item.value}</p>
               <p className="text-xs text-muted-foreground">{item.meta}</p>
             </CardContent>
           </Card>
