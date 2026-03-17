@@ -1,0 +1,38 @@
+---
+description: X Monitor module - Polymarket tweet count market monitoring
+globs:
+  - zentrade-app/src/app/x-monitor/**
+  - zentrade-app/src/components/modules/x-monitor/**
+  - zentrade-app/src/lib/xmonitor-*
+  - zentrade-app/src/types/xmonitor.ts
+  - zentrade-backend/app/xmonitor/**
+---
+
+# X Monitor Module
+
+## Overview
+Monitors Elon Musk's X posting activity via XTracker API (Polymarket's official resolution source) and provides strategy-driven alerts for Polymarket tweet count markets.
+
+## Data Sources
+- **XTracker API**: `xtracker.polymarket.com/api` - post counts, tracking periods, individual posts
+- **Polymarket Gamma API**: `gamma-api.polymarket.com` - market bracket prices
+
+## Architecture
+- Backend poller runs every 2.5min for XTracker, 5min for Polymarket
+- Strategy engine evaluates 4 strategy templates with per-instance throttling
+- WebSocket pushes real-time updates to frontend
+- Web Push notifications via pywebpush + Service Worker
+
+## Strategy Types
+1. `silent_period` - Alert when no posts for configured hours
+2. `tail_sweep` - Alert when bracket already passed and Yes price high
+3. `settlement_no` - Alert when gap too large near settlement (buy No)
+4. `panic_fade` - Alert when panic Yes buying on unreachable brackets (buy No)
+
+## Key Files
+- Backend: `zentrade-backend/app/xmonitor/` (poller, strategy, clients, router, push, database, models)
+- Frontend: `zentrade-app/src/app/x-monitor/page.tsx`, `src/components/modules/x-monitor/`
+- Store: `zentrade-app/src/lib/xmonitor-store.ts`
+- API: `zentrade-app/src/lib/xmonitor-api.ts`
+- Types: `zentrade-app/src/types/xmonitor.ts`
+- Service Worker: `zentrade-app/public/sw.js`

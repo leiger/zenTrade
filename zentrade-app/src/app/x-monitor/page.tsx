@@ -1,0 +1,222 @@
+'use client';
+
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ApiStatusBanner } from '@/components/modules/x-monitor/ApiStatusBanner';
+import { MonitorHeader } from '@/components/modules/x-monitor/MonitorHeader';
+import { AlertTimeline } from '@/components/modules/x-monitor/AlertTimeline';
+import { StrategyManager } from '@/components/modules/x-monitor/StrategyManager';
+import { useXMonitorStore } from '@/lib/xmonitor-store';
+import { mapStatus } from '@/lib/xmonitor-api';
+import type { MonitorAlert, StrategyType } from '@/types/xmonitor';
+import { STRATEGY_TYPE_LABELS } from '@/types/xmonitor';
+
+const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
+  .replace(/^http/, 'ws');
+
+const FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'All' },
+  ...Object.entries(STRATEGY_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v })),
+];
+
+export default function XMonitorPage() {
+  return (
+    <Suspense>
+      <XMonitorContent />
+    </Suspense>
+  );
+}
+
+function XMonitorContent() {
+  const searchParams = useSearchParams();
+  const {
+    status,
+    alerts,
+    strategies,
+    loading,
+    refreshing,
+    alertFilter,
+    highlightAlertId,
+    fetchStatus,
+    fetchAlerts,
+    fetchStrategies,
+    refreshData,
+    submitFeedback,
+    createStrategy,
+    updateStrategy,
+    deleteStrategy,
+    setAlertFilter,
+    setHighlightAlertId,
+    prependAlert,
+    updateStatus,
+  } = useXMonitorStore();
+
+  const [selectedTrackingId, setSelectedTrackingId] = useState<string | null>(null);
+  const [strategyPanelOpen, setStrategyPanelOpen] = useState(false);
+  const [strategyPanelClosing, setStrategyPanelClosing] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const closeStrategyPanel = useCallback(() => {
+    setStrategyPanelClosing(true);
+    setTimeout(() => {
+      setStrategyPanelOpen(false);
+      setStrategyPanelClosing(false);
+    }, 300);
+  }, []);
+
+  const openStrategyPanel = useCallback(() => {
+    setStrategyPanelClosing(false);
+    setStrategyPanelOpen(true);
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    fetchAlerts();
+    fetchStrategies();
+  }, [fetchStatus, fetchAlerts, fetchStrategies]);
+
+  useEffect(() => {
+    const alertId = searchParams.get('alert');
+    if (alertId) {
+      setHighlightAlertId(alertId);
+    }
+  }, [searchParams, setHighlightAlertId]);
+
+  // WebSocket connection
+  useEffect(() => {
+    const ws = new WebSocket(`${WS_BASE}/xmonitor/ws`);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'status_update') {
+          updateStatus(mapStatus(msg.data));
+        } else if (msg.type === 'new_alert') {
+          prependAlert(mapWsAlert(msg.data));
+        } else if (msg.type === 'api_health_change' && status) {
+          const updated = { ...status };
+          if (msg.data.api === 'xtracker') {
+            updated.apiHealth = { ...updated.apiHealth, xtracker: msg.data.status, xtrackerError: msg.data.error ?? null };
+          } else if (msg.data.api === 'polymarket') {
+            updated.apiHealth = { ...updated.apiHealth, polymarket: msg.data.status, polymarketError: msg.data.error ?? null };
+          }
+          updateStatus(updated);
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
+
+    ws.onclose = () => {
+      setTimeout(() => {
+        if (wsRef.current === ws) wsRef.current = null;
+      }, 5000);
+    };
+
+    return () => ws.close();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredAlerts = alertFilter
+    ? alerts.filter((a) => a.strategyType === alertFilter)
+    : alerts;
+
+  const handleFilterChange = useCallback(
+    (value: string) => setAlertFilter(value === 'all' ? null : (value as StrategyType)),
+    [setAlertFilter],
+  );
+
+  const handleFeedback = useCallback(
+    (alertId: string, feedback: 'yes' | 'no') => submitFeedback(alertId, feedback),
+    [submitFeedback],
+  );
+
+  if (!status && loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mx-auto max-w-5xl space-y-5">
+        {status?.apiHealth && <ApiStatusBanner health={status.apiHealth} />}
+
+        {status && (
+          <MonitorHeader
+            status={status}
+            selectedTrackingId={selectedTrackingId}
+            onTrackingChange={setSelectedTrackingId}
+            onManageStrategies={openStrategyPanel}
+            refreshing={refreshing}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {/* Alert section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <h2 className="text-lg font-semibold">Strategy Alerts</h2>
+              <p className="text-xs text-muted-foreground">
+                Real-time alerts from active strategies. Give Yes/No feedback to iterate.
+              </p>
+            </div>
+          </div>
+
+          <Tabs value={alertFilter ?? 'all'} onValueChange={handleFilterChange}>
+            <TabsList className="h-8">
+              {FILTER_OPTIONS.map((opt) => (
+                <TabsTrigger key={opt.value} value={opt.value} className="text-xs px-3 h-7">
+                  {opt.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          <div className="pb-8">
+            <AlertTimeline
+              alerts={filteredAlerts}
+              highlightAlertId={highlightAlertId}
+              onFeedback={handleFeedback}
+              onClearHighlight={() => setHighlightAlertId(null)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Strategy panel (drawer) */}
+      <StrategyManager
+        open={strategyPanelOpen}
+        closing={strategyPanelClosing}
+        onClose={closeStrategyPanel}
+        strategies={strategies}
+        onToggle={(id, enabled) => updateStrategy(id, { enabled })}
+        onCreate={createStrategy}
+        onUpdate={(id, updates) => updateStrategy(id, updates)}
+        onDelete={deleteStrategy}
+      />
+    </div>
+  );
+}
+
+function mapWsAlert(data: Record<string, unknown>): MonitorAlert {
+  return {
+    id: data.id as string,
+    strategyInstanceId: (data.strategy_instance_id as string) ?? '',
+    strategyType: (data.strategy_type as StrategyType) ?? 'silent_period',
+    trackingId: (data.tracking_id as string) ?? '',
+    bracket: (data.bracket as string | null) ?? null,
+    triggerData: (data.trigger_data as Record<string, unknown>) ?? {},
+    message: (data.message as string) ?? '',
+    polymarketUrl: (data.polymarket_url as string) ?? '',
+    feedback: null,
+    feedbackNote: null,
+    createdAt: (data.created_at as string) ?? new Date().toISOString(),
+    feedbackAt: null,
+    pushSent: (data.push_sent as boolean) ?? false,
+  };
+}

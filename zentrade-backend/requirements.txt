@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 pydantic
 aiosqlite
+httpx
+pywebpush
+cryptography
