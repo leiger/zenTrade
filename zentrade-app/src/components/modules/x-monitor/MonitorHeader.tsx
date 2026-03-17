@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ExternalLink, Settings2, MessageSquare, Clock, Timer, TrendingUp, Radio, RefreshCw } from 'lucide-react';
+import { ExternalLink, History, MessageSquare, Clock, Timer, TrendingUp, Radio, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ interface MonitorHeaderProps {
   status: MonitorStatus;
   selectedTrackingId: string | null;
   onTrackingChange: (id: string) => void;
-  onManageStrategies: () => void;
+  onHistory: () => void;
   refreshing: boolean;
   onRefresh: () => void;
 }
@@ -71,7 +72,7 @@ function useTimeSince(isoDate: string | null): string {
   return text;
 }
 
-export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onManageStrategies, refreshing, onRefresh }: MonitorHeaderProps) {
+export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onHistory, refreshing, onRefresh }: MonitorHeaderProps) {
   const tracking = getSelectedTracking(status, selectedTrackingId);
   const remaining = getRemainingSeconds(tracking);
   const pmUrl = tracking?.marketLink ?? '';
@@ -84,18 +85,26 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <Radio className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">X Monitor</h1>
-            <span className="text-sm text-muted-foreground">— Elon Musk</span>
+            <h1 className="text-2xl font-bold tracking-tight font-oswald">X Monitor</h1>
+            <span className="text-sm text-muted-foreground">—</span>
+            <a
+              href={`https://x.com/${status.userHandle}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-muted-foreground/40 transition-colors"
+            >
+              @{status.userHandle}
+            </a>
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
             <span>Polymarket tweet count market monitoring & strategy alerts</span>
             <span className="text-border">|</span>
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-2.5 w-2.5 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'Syncing…' : `Synced ${syncedAgo}`}</span>
             </button>
           </div>
@@ -116,18 +125,40 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
               </SelectContent>
             </Select>
           )}
-          {pmUrl && (
-            <Button variant="outline" size="sm" className="gap-1.5" asChild>
-              <a href={pmUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Polymarket
-              </a>
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onManageStrategies}>
-            <Settings2 className="h-3.5 w-3.5" />
-            Strategies
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8" asChild>
+                  <a href="https://xtracker.polymarket.com" target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>XTracker</TooltipContent>
+            </Tooltip>
+
+            {pmUrl && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8" asChild>
+                    <a href={pmUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Polymarket</TooltipContent>
+              </Tooltip>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={onHistory}>
+                  <History className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Alert History</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -180,7 +211,7 @@ function StatCard({ icon, iconBg, label, value, sub }: {
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
         <div className="flex items-baseline gap-1.5">
-          <p className="text-lg font-semibold leading-none">{value}</p>
+          <p className="text-lg font-oswald tabular-nums tracking-wide leading-none">{value}</p>
           {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
         </div>
       </div>

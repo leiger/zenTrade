@@ -10,9 +10,12 @@ interface XMonitorStore {
   refreshing: boolean;
   alertFilter: StrategyType | null;
   highlightAlertId: string | null;
+  alertsHasMore: boolean;
+  loadingMore: boolean;
 
   fetchStatus: () => Promise<void>;
   fetchAlerts: (strategyType?: string) => Promise<void>;
+  fetchMoreAlerts: () => Promise<void>;
   refreshData: () => Promise<void>;
   fetchStrategies: () => Promise<void>;
   submitFeedback: (alertId: string, feedback: 'yes' | 'no', note?: string) => Promise<void>;
@@ -33,6 +36,8 @@ export const useXMonitorStore = create<XMonitorStore>((set, get) => ({
   refreshing: false,
   alertFilter: null,
   highlightAlertId: null,
+  alertsHasMore: false,
+  loadingMore: false,
 
   fetchStatus: async () => {
     try {
@@ -58,11 +63,28 @@ export const useXMonitorStore = create<XMonitorStore>((set, get) => ({
   fetchAlerts: async (strategyType?: string) => {
     try {
       set({ loading: true });
-      const alerts = await api.fetchAlerts(strategyType);
-      set({ alerts, loading: false });
+      const alerts = await api.fetchAlerts(strategyType, 50, 0);
+      set({ alerts, loading: false, alertsHasMore: alerts.length >= 50 });
     } catch (e) {
       console.error('[XMonitor] Failed to fetch alerts:', e);
       set({ loading: false });
+    }
+  },
+
+  fetchMoreAlerts: async () => {
+    const { alerts, loadingMore } = get();
+    if (loadingMore) return;
+    set({ loadingMore: true });
+    try {
+      const more = await api.fetchAlerts(undefined, 50, alerts.length);
+      set({
+        alerts: [...alerts, ...more],
+        alertsHasMore: more.length >= 50,
+        loadingMore: false,
+      });
+    } catch (e) {
+      console.error('[XMonitor] Failed to fetch more alerts:', e);
+      set({ loadingMore: false });
     }
   },
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, Oswald, Bebas_Neue } from 'next/font/google';
+import { Geist, Geist_Mono, Roboto_Condensed, Bebas_Neue } from 'next/font/google';
 import './globals.css';
 import { AppSidebar } from '@/components/shared/Sidebar';
 import { DynamicBreadcrumb } from '@/components/shared/DynamicBreadcrumb';
@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
   display: 'swap',
 });
 
-const oswald = Oswald({
+const robotoCondensed = Roboto_Condensed({
   subsets: ['latin'],
   variable: '--font-oswald',
   display: 'swap',
@@ -44,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oswald.variable} ${bebasNeue.variable} font-sans antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${robotoCondensed.variable} ${bebasNeue.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Zap,
   Bell,
+  Loader2,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,9 @@ interface AlertTimelineProps {
   highlightAlertId: string | null;
   onFeedback: (alertId: string, feedback: 'yes' | 'no') => void;
   onClearHighlight: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const STRATEGY_CONFIG: Record<StrategyType, {
@@ -73,7 +77,7 @@ function groupByDate(alerts: MonitorAlert[]): Map<string, MonitorAlert[]> {
   return groups;
 }
 
-export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHighlight }: AlertTimelineProps) {
+export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHighlight, hasMore, loadingMore, onLoadMore }: AlertTimelineProps) {
   const highlightRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,7 +154,7 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
                             <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-widest leading-none">
                               {STRATEGY_TYPE_LABELS[alert.strategyType]}
                             </span>
-                            <span className="text-[13px] font-bold text-foreground tabular-nums tracking-tight leading-none" suppressHydrationWarning>
+                            <span className="text-[13px] font-oswald text-foreground tabular-nums tracking-tight leading-none" suppressHydrationWarning>
                               {format(new Date(alert.createdAt), 'HH:mm')}
                             </span>
                           </div>
@@ -248,6 +252,21 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
           </div>
         </div>
       ))}
+
+      {onLoadMore && hasMore && (
+        <div className="flex justify-center py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="gap-1.5"
+          >
+            {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {loadingMore ? 'Loading…' : 'Load More'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

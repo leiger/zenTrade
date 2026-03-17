@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 pydantic
+eval_type_backport
 aiosqlite
 httpx
 pywebpush

@@ -5,11 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiStatusBanner } from '@/components/modules/x-monitor/ApiStatusBanner';
 import { MonitorHeader } from '@/components/modules/x-monitor/MonitorHeader';
+import { StrategyList } from '@/components/modules/x-monitor/StrategyList';
 import { AlertTimeline } from '@/components/modules/x-monitor/AlertTimeline';
 import { StrategyManager } from '@/components/modules/x-monitor/StrategyManager';
+import { HistoryDialog } from '@/components/modules/x-monitor/HistoryDialog';
 import { useXMonitorStore } from '@/lib/xmonitor-store';
 import { mapStatus } from '@/lib/xmonitor-api';
-import type { MonitorAlert, StrategyType } from '@/types/xmonitor';
+import type { MonitorAlert, StrategyInstance, StrategyType } from '@/types/xmonitor';
 import { STRATEGY_TYPE_LABELS } from '@/types/xmonitor';
 
 const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
@@ -38,8 +40,11 @@ function XMonitorContent() {
     refreshing,
     alertFilter,
     highlightAlertId,
+    alertsHasMore,
+    loadingMore,
     fetchStatus,
     fetchAlerts,
+    fetchMoreAlerts,
     fetchStrategies,
     refreshData,
     submitFeedback,
@@ -53,22 +58,10 @@ function XMonitorContent() {
   } = useXMonitorStore();
 
   const [selectedTrackingId, setSelectedTrackingId] = useState<string | null>(null);
-  const [strategyPanelOpen, setStrategyPanelOpen] = useState(false);
-  const [strategyPanelClosing, setStrategyPanelClosing] = useState(false);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [editingStrategy, setEditingStrategy] = useState<StrategyInstance | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-
-  const closeStrategyPanel = useCallback(() => {
-    setStrategyPanelClosing(true);
-    setTimeout(() => {
-      setStrategyPanelOpen(false);
-      setStrategyPanelClosing(false);
-    }, 300);
-  }, []);
-
-  const openStrategyPanel = useCallback(() => {
-    setStrategyPanelClosing(false);
-    setStrategyPanelOpen(true);
-  }, []);
 
   useEffect(() => {
     fetchStatus();
@@ -83,7 +76,6 @@ function XMonitorContent() {
     }
   }, [searchParams, setHighlightAlertId]);
 
-  // WebSocket connection
   useEffect(() => {
     const ws = new WebSocket(`${WS_BASE}/xmonitor/ws`);
     wsRef.current = ws;
@@ -132,6 +124,27 @@ function XMonitorContent() {
     [submitFeedback],
   );
 
+  const handleAddStrategy = useCallback(() => {
+    setEditingStrategy(null);
+    setFormDialogOpen(true);
+  }, []);
+
+  const handleEditStrategy = useCallback((strategy: StrategyInstance) => {
+    setEditingStrategy(strategy);
+    setFormDialogOpen(true);
+  }, []);
+
+  const handleFormSave = useCallback(
+    (type: StrategyType, name: string, params: Record<string, unknown>) => {
+      if (editingStrategy) {
+        updateStrategy(editingStrategy.id, { name, params });
+      } else {
+        createStrategy(type, name, params);
+      }
+    },
+    [editingStrategy, updateStrategy, createStrategy],
+  );
+
   if (!status && loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -150,21 +163,28 @@ function XMonitorContent() {
             status={status}
             selectedTrackingId={selectedTrackingId}
             onTrackingChange={setSelectedTrackingId}
-            onManageStrategies={openStrategyPanel}
+            onHistory={() => setHistoryOpen(true)}
             refreshing={refreshing}
             onRefresh={refreshData}
           />
         )}
 
+        {/* Strategy list */}
+        <StrategyList
+          strategies={strategies}
+          onToggle={(id, enabled) => updateStrategy(id, { enabled })}
+          onAdd={handleAddStrategy}
+          onEdit={handleEditStrategy}
+          onDelete={deleteStrategy}
+        />
+
         {/* Alert section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <h2 className="text-lg font-semibold">Strategy Alerts</h2>
-              <p className="text-xs text-muted-foreground">
-                Real-time alerts from active strategies. Give Yes/No feedback to iterate.
-              </p>
-            </div>
+          <div className="space-y-0.5">
+            <h2 className="text-lg font-semibold font-oswald">Strategy Alerts</h2>
+            <p className="text-xs text-muted-foreground">
+              Real-time alerts from active strategies. Give Yes/No feedback to iterate.
+            </p>
           </div>
 
           <Tabs value={alertFilter ?? 'all'} onValueChange={handleFilterChange}>
@@ -183,21 +203,27 @@ function XMonitorContent() {
               highlightAlertId={highlightAlertId}
               onFeedback={handleFeedback}
               onClearHighlight={() => setHighlightAlertId(null)}
+              hasMore={alertsHasMore}
+              loadingMore={loadingMore}
+              onLoadMore={fetchMoreAlerts}
             />
           </div>
         </div>
       </div>
 
-      {/* Strategy panel (drawer) */}
+      {/* Strategy form dialog */}
       <StrategyManager
-        open={strategyPanelOpen}
-        closing={strategyPanelClosing}
-        onClose={closeStrategyPanel}
-        strategies={strategies}
-        onToggle={(id, enabled) => updateStrategy(id, { enabled })}
-        onCreate={createStrategy}
-        onUpdate={(id, updates) => updateStrategy(id, updates)}
-        onDelete={deleteStrategy}
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        editing={editingStrategy}
+        onSave={handleFormSave}
+      />
+
+      {/* History dialog */}
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onFeedback={handleFeedback}
       />
     </div>
   );
