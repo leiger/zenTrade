@@ -14,6 +14,7 @@ from app.xmonitor.database import (
     list_push_subscriptions,
     list_strategies,
     upsert_tracking,
+    save_historical_posts,
 )
 from app.xmonitor.models import ApiHealthStatus
 from app.xmonitor.strategy import StrategyEngine
@@ -167,6 +168,8 @@ class XMonitorPoller:
                         self.tracking_post_count[tid] = len(posts)
 
                         if posts:
+                            await save_historical_posts(db, posts)
+                            
                             latest = max(posts, key=lambda p: p.get("createdAt", ""))
                             self.tracking_last_post_at[tid] = datetime.fromisoformat(
                                 latest["createdAt"].replace("Z", "+00:00")

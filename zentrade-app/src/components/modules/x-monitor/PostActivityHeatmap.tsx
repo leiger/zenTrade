@@ -6,7 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DateRangePicker } from '@/components/ui/date-picker';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { fetchPostStats, type PostActivityStats } from '@/lib/xmonitor-api';
+import { useXMonitorStore } from '@/lib/xmonitor-store';
 import { cn } from '@/lib/utils';
+import { PostTimeline } from '@/components/modules/x-monitor/PostTimeline';
 
 const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
@@ -47,6 +49,9 @@ export function PostActivityHeatmap() {
   const [stats, setStats] = useState<PostActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const status = useXMonitorStore((s) => s.status);
+  const lastPolledAt = status?.lastPolledAt;
+
   const loadStats = useCallback(async (start?: string, end?: string) => {
     setLoading(true);
     try {
@@ -59,18 +64,18 @@ export function PostActivityHeatmap() {
     }
   }, []);
 
-  // Load on mount and whenever preset changes
+  // Load on mount and whenever preset or data updates
   useEffect(() => {
     if (isCustom) return;
     const range = getPresetRange(preset);
     loadStats(range.start, range.end);
-  }, [preset, isCustom, loadStats]);
+  }, [preset, isCustom, loadStats, lastPolledAt]);
 
-  // Load when custom range completes
+  // Load when custom range or data updates
   useEffect(() => {
     if (!isCustom || !customFrom || !customTo) return;
     loadStats(customFrom.toISOString(), customTo.toISOString());
-  }, [isCustom, customFrom, customTo, loadStats]);
+  }, [isCustom, customFrom, customTo, loadStats, lastPolledAt]);
 
   const handlePreset = (p: Preset) => {
     setIsCustom(false);
@@ -85,9 +90,8 @@ export function PostActivityHeatmap() {
     }
   };
 
-  const rangeLabel = isCustom && customFrom && customTo
-    ? `Custom Range`
-    : getPresetRange(preset).label;
+  const rangeLabel =
+    isCustom && customFrom && customTo ? `Custom Range` : getPresetRange(preset).label;
 
   const maxVal = stats ? Math.max(...stats.matrix.flat(), 1) : 1;
   const maxHourVal = stats ? Math.max(...stats.hour_totals, 1) : 1;
@@ -108,7 +112,7 @@ export function PostActivityHeatmap() {
                 'rounded-md px-3 py-1 text-xs font-medium transition-all',
                 !isCustom && preset === p
                   ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
               {p === 'all' ? 'ALL TIME' : p.toUpperCase()}
@@ -147,6 +151,9 @@ export function PostActivityHeatmap() {
             <TabsTrigger value="hourly" className="text-xs px-3 h-5">
               Hourly Heatmap
             </TabsTrigger>
+            <TabsTrigger value="timeline" className="text-xs px-3 h-5">
+              Timeline
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="day-hour" className="mt-3">
@@ -155,6 +162,13 @@ export function PostActivityHeatmap() {
 
           <TabsContent value="hourly" className="mt-3">
             <HourlyHeatmap stats={stats} maxVal={maxHourVal} />
+          </TabsContent>
+
+          <TabsContent value="timeline" className="mt-3">
+            <PostTimeline
+              startDate={isCustom ? customFrom?.toISOString() : getPresetRange(preset).start}
+              endDate={isCustom ? customTo?.toISOString() : getPresetRange(preset).end}
+            />
           </TabsContent>
         </Tabs>
       ) : null}
@@ -175,7 +189,10 @@ function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
           <tr>
             <th className="w-12 text-[10px] font-medium text-muted-foreground text-left">Day</th>
             {HOURS.map((h) => (
-              <th key={h} className="text-[10px] font-medium text-muted-foreground text-center w-[38px]">
+              <th
+                key={h}
+                className="text-[10px] font-medium text-muted-foreground text-center w-[38px]"
+              >
                 {h}
               </th>
             ))}
@@ -193,7 +210,7 @@ function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                   key={hi}
                   className={cn(
                     'text-center text-[11px] font-medium rounded-md py-1.5 transition-colors',
-                    cellColor(val, maxVal),
+                    cellColor(val, maxVal)
                   )}
                 >
                   {val || ''}
@@ -248,21 +265,27 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">Peak Hour</span>
+            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Peak Hour
+            </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
               {HOURS[stats.hour_totals.indexOf(Math.max(...stats.hour_totals))]}:00
             </span>
           </div>
           <div className="h-3 w-[1px] bg-border/60" />
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">Peak Count</span>
+            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Peak Count
+            </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
               {Math.max(...stats.hour_totals).toLocaleString()}
             </span>
           </div>
           <div className="h-3 w-[1px] bg-border/60" />
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">Avg / Hr</span>
+            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              Avg / Hr
+            </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
               {Math.round(stats.total_posts / 24).toLocaleString()}
             </span>
@@ -286,12 +309,11 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                     onMouseEnter={() => setHoveredHour(i)}
                     onMouseLeave={() => setHoveredHour(null)}
                   >
-                    <span className="text-[9px] font-medium text-foreground/70 tabular-nums mb-1">
-                    </span>
+                    <span className="text-[9px] font-medium text-foreground/70 tabular-nums mb-1"></span>
                     <div
                       className={cn(
                         'w-full rounded-t-sm transition-all bg-muted/30',
-                        hoveredHour === i ? 'ring-2 ring-primary/50' : '',
+                        hoveredHour === i ? 'ring-2 ring-primary/50' : ''
                       )}
                       style={{ height: `${heightPct}%` }}
                     />
@@ -320,7 +342,7 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                               ? 'bg-amber-400/70'
                               : ratio > 0.25
                                 ? 'bg-amber-500/40'
-                                : 'bg-amber-600/20',
+                                : 'bg-amber-600/20'
                         )}
                         style={{ height: `${heightPct}%` }}
                       />
@@ -331,11 +353,7 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                     sideOffset={8}
                     className="w-[200px] p-3 pointer-events-none"
                   >
-                    <BucketDetail
-                      hour={i}
-                      buckets={stats.minute_buckets[i]}
-                      hourTotal={val}
-                    />
+                    <BucketDetail hour={i} buckets={stats.minute_buckets[i]} hourTotal={val} />
                   </HoverCardContent>
                 </HoverCard>
               );
@@ -349,7 +367,7 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                 key={h}
                 className={cn(
                   'flex-1 text-center text-[10px] font-medium transition-colors',
-                  hoveredHour === i ? 'text-primary font-bold' : 'text-muted-foreground',
+                  hoveredHour === i ? 'text-primary font-bold' : 'text-muted-foreground'
                 )}
               >
                 {h}
@@ -358,7 +376,6 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
           </div>
         </div>
       </div>
-
     </div>
   );
 }
@@ -380,9 +397,7 @@ function BucketDetail({
     <div className="space-y-1.5">
       <div className="text-[11px] font-semibold text-foreground mb-2">
         {HOURS[hour]}:00 – {HOURS[hour]}:59
-        <span className="text-muted-foreground font-normal ml-1.5">
-          ({hourTotal} posts)
-        </span>
+        <span className="text-muted-foreground font-normal ml-1.5">({hourTotal} posts)</span>
       </div>
       {BUCKET_LABELS.map((label, bi) => {
         const count = buckets[bi];
@@ -397,7 +412,7 @@ function BucketDetail({
               <div
                 className={cn(
                   'h-full rounded-sm transition-all',
-                  count > 0 ? 'bg-amber-400/70' : '',
+                  count > 0 ? 'bg-amber-400/70' : ''
                 )}
                 style={{ width: `${barWidth}%` }}
               />

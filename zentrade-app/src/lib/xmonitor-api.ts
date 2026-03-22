@@ -114,7 +114,7 @@ export async function fetchPastTrackings(): Promise<TrackingPeriod[]> {
 export async function fetchAlerts(
   strategyType?: string,
   limit = 50,
-  offset = 0,
+  offset = 0
 ): Promise<MonitorAlert[]> {
   const params = new URLSearchParams();
   if (strategyType) params.set('strategy_type', strategyType);
@@ -127,7 +127,7 @@ export async function fetchAlerts(
 export async function postAlertFeedback(
   alertId: string,
   feedback: 'yes' | 'no',
-  note?: string,
+  note?: string
 ): Promise<MonitorAlert> {
   const raw = await req<Record<string, unknown>>(`/xmonitor/alerts/${alertId}/feedback`, {
     method: 'POST',
@@ -145,7 +145,7 @@ export async function createStrategy(
   strategyType: StrategyType,
   name: string,
   params: Record<string, unknown>,
-  enabled = true,
+  enabled = true
 ): Promise<StrategyInstance> {
   const raw = await req<Record<string, unknown>>('/xmonitor/strategies', {
     method: 'POST',
@@ -156,7 +156,7 @@ export async function createStrategy(
 
 export async function updateStrategy(
   id: string,
-  updates: { name?: string; enabled?: boolean; params?: Record<string, unknown> },
+  updates: { name?: string; enabled?: boolean; params?: Record<string, unknown> }
 ): Promise<StrategyInstance> {
   const raw = await req<Record<string, unknown>>(`/xmonitor/strategies/${id}`, {
     method: 'PUT',
@@ -169,11 +169,7 @@ export async function deleteStrategy(id: string): Promise<void> {
   await req<void>(`/xmonitor/strategies/${id}`, { method: 'DELETE' });
 }
 
-export async function subscribePush(
-  endpoint: string,
-  p256dh: string,
-  auth: string,
-): Promise<void> {
+export async function subscribePush(endpoint: string, p256dh: string, auth: string): Promise<void> {
   await req('/xmonitor/push/subscribe', {
     method: 'POST',
     body: JSON.stringify({ endpoint, p256dh, auth }),
@@ -204,11 +200,37 @@ export interface PostActivityStats {
 
 export async function fetchPostStats(
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<PostActivityStats> {
   const params = new URLSearchParams();
   if (startDate) params.set('start_date', startDate);
   if (endDate) params.set('end_date', endDate);
   const qs = params.toString();
   return req<PostActivityStats>(`/xmonitor/posts/stats${qs ? `?${qs}` : ''}`);
+}
+
+export interface HistoricalPost {
+  id: string;
+  userId: string;
+  platformId: string;
+  content: string;
+  createdAt: string;
+  importedAt: string;
+  metrics: Record<string, number> | null;
+  rawData: Record<string, unknown> | null;
+}
+
+export async function fetchPostHistory(
+  limit = 50,
+  offset = 0,
+  startDate?: string,
+  endDate?: string
+): Promise<HistoricalPost[]> {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+  const qs = params.toString();
+  return req<HistoricalPost[]>(`/xmonitor/posts/history${qs ? `?${qs}` : ''}`);
 }

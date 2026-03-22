@@ -355,6 +355,48 @@ async def save_historical_posts(db: aiosqlite.Connection, posts: list[dict]) -> 
     return count
 
 
+async def get_historical_posts(
+    db: aiosqlite.Connection,
+    limit: int = 50,
+    offset: int = 0,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict]:
+    where_parts: list[str] = []
+    params: list = []
+    if start_date:
+        where_parts.append("created_at >= ?")
+        params.append(start_date)
+    if end_date:
+        where_parts.append("created_at < ?")
+        params.append(end_date)
+        
+    where_clause = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    
+    sql = f"""
+        SELECT *
+        FROM xmonitor_historical_posts
+        {where_clause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """
+    params.extend([limit, offset])
+    rows = await fetchall(db, sql, tuple(params))
+    
+    return [
+        {
+            "id": r["id"],
+            "userId": r["user_id"],
+            "platformId": r["platform_id"],
+            "content": r["content"],
+            "createdAt": r["created_at"],
+            "importedAt": r["imported_at"],
+            "metrics": json.loads(r["metrics"]) if r["metrics"] else None,
+            "rawData": json.loads(r["raw_data"]) if r["raw_data"] else None,
+        } for r in rows
+    ]
+
+
 async def get_post_activity_matrix(
     db: aiosqlite.Connection,
     start_date: str | None = None,

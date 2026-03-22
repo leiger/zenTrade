@@ -181,6 +181,22 @@ async def unsubscribe_push(endpoint: str = Query(...)):
         await db.close()
 
 
+@router.get("/posts/history")
+async def get_post_history(
+    limit: int = Query(50, le=100),
+    offset: int = Query(0, ge=0),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+):
+    """Paginated historical posts."""
+    from app.xmonitor.database import get_historical_posts
+    db = await get_db()
+    try:
+        return await get_historical_posts(db, limit, offset, start_date, end_date)
+    finally:
+        await db.close()
+
+
 @router.get("/posts/stats")
 async def get_post_stats(
     start_date: Optional[str] = Query(None),
