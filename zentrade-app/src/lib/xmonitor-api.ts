@@ -190,3 +190,25 @@ export async function fetchVapidKey(): Promise<string> {
   const data = await req<{ public_key: string }>('/xmonitor/push/vapid-key');
   return data.public_key;
 }
+export async function importMuskTweets(): Promise<{ status: string; imported: number }> {
+  return req<{ status: string; imported: number }>('/xmonitor/import-tweets', { method: 'POST' });
+}
+
+export interface PostActivityStats {
+  total_posts: number;
+  matrix: number[][];
+  day_totals: number[];
+  hour_totals: number[];
+  minute_buckets: number[][];
+}
+
+export async function fetchPostStats(
+  startDate?: string,
+  endDate?: string,
+): Promise<PostActivityStats> {
+  const params = new URLSearchParams();
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+  const qs = params.toString();
+  return req<PostActivityStats>(`/xmonitor/posts/stats${qs ? `?${qs}` : ''}`);
+}

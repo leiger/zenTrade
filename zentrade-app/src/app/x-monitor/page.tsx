@@ -2,17 +2,19 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ApiStatusBanner } from '@/components/modules/x-monitor/ApiStatusBanner';
 import { MonitorHeader } from '@/components/modules/x-monitor/MonitorHeader';
 import { StrategyList } from '@/components/modules/x-monitor/StrategyList';
 import { AlertTimeline } from '@/components/modules/x-monitor/AlertTimeline';
 import { StrategyManager } from '@/components/modules/x-monitor/StrategyManager';
 import { HistoryDialog } from '@/components/modules/x-monitor/HistoryDialog';
+import { PostActivityHeatmap } from '@/components/modules/x-monitor/PostActivityHeatmap';
 import { useXMonitorStore } from '@/lib/xmonitor-store';
-import { mapStatus } from '@/lib/xmonitor-api';
+import { mapStatus, importMuskTweets } from '@/lib/xmonitor-api';
 import type { MonitorAlert, StrategyInstance, StrategyType } from '@/types/xmonitor';
 import { STRATEGY_TYPE_LABELS } from '@/types/xmonitor';
+import { Separator } from '@/components/ui/separator';
 
 const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
   .replace(/^http/, 'ws');
@@ -61,7 +63,20 @@ function XMonitorContent() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingStrategy, setEditingStrategy] = useState<StrategyInstance | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const handleImport = useCallback(async () => {
+    setImporting(true);
+    try {
+      const res = await importMuskTweets();
+      alert(`Successfully imported ${res.imported} tweets!`);
+    } catch (e) {
+      alert(`Failed to import tweets: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setImporting(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchStatus();
@@ -111,7 +126,7 @@ function XMonitorContent() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveTrackingId = selectedTrackingId ?? status?.activeTrackings?.[0]?.id;
-  
+
   const filteredAlerts = alerts.filter((a) => {
     if (effectiveTrackingId && a.trackingId !== effectiveTrackingId) return false;
     if (alertFilter && a.strategyType !== alertFilter) return false;
@@ -170,49 +185,69 @@ function XMonitorContent() {
             onHistory={() => setHistoryOpen(true)}
             refreshing={refreshing}
             onRefresh={refreshData}
+            importing={importing}
+            onImport={handleImport}
           />
         )}
 
-        {/* Strategy list */}
-        <StrategyList
-          strategies={strategies}
-          onToggle={(id, enabled) => updateStrategy(id, { enabled })}
-          onAdd={handleAddStrategy}
-          onEdit={handleEditStrategy}
-          onDelete={deleteStrategy}
-        />
+        <Separator className="bg-border/50" />
 
-        {/* Alert section */}
-        <div className="space-y-3">
-          <div className="space-y-0.5">
-            <h2 className="text-lg font-semibold">Strategy Alerts</h2>
-            <p className="text-xs text-muted-foreground">
-              Real-time alerts from active strategies. Give Yes/No feedback to iterate.
-            </p>
-          </div>
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="general">Summary</TabsTrigger>
+            <TabsTrigger value="list">Strategy List</TabsTrigger>
+            <TabsTrigger value="manager">Strategy Manager</TabsTrigger>
+          </TabsList>
 
-          <Tabs value={alertFilter ?? 'all'} onValueChange={handleFilterChange}>
-            <TabsList className="h-8">
-              {FILTER_OPTIONS.map((opt) => (
-                <TabsTrigger key={opt.value} value={opt.value} className="text-xs px-3 h-7">
-                  {opt.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <TabsContent value="general" className="space-y-4">
+            <PostActivityHeatmap />
+          </TabsContent>
 
-          <div className="pb-8">
-            <AlertTimeline
-              alerts={filteredAlerts}
-              highlightAlertId={highlightAlertId}
-              onFeedback={handleFeedback}
-              onClearHighlight={() => setHighlightAlertId(null)}
-              hasMore={alertsHasMore}
-              loadingMore={loadingMore}
-              onLoadMore={fetchMoreAlerts}
+          <TabsContent value="list" className="space-y-4">
+            {/* Alert section */}
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <h2 className="text-lg font-semibold">Strategy Alerts</h2>
+                <p className="text-xs text-muted-foreground">
+                  Real-time alerts from active strategies. Give Yes/No feedback to iterate.
+                </p>
+              </div>
+
+              <Tabs value={alertFilter ?? 'all'} onValueChange={handleFilterChange}>
+                <TabsList className="h-8">
+                  {FILTER_OPTIONS.map((opt) => (
+                    <TabsTrigger key={opt.value} value={opt.value} className="text-xs px-3 h-7">
+                      {opt.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
+              <div className="pb-8">
+                <AlertTimeline
+                  alerts={filteredAlerts}
+                  highlightAlertId={highlightAlertId}
+                  onFeedback={handleFeedback}
+                  onClearHighlight={() => setHighlightAlertId(null)}
+                  hasMore={alertsHasMore}
+                  loadingMore={loadingMore}
+                  onLoadMore={fetchMoreAlerts}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="manager" className="space-y-4">
+            {/* Strategy list */}
+            <StrategyList
+              strategies={strategies}
+              onToggle={(id, enabled) => updateStrategy(id, { enabled })}
+              onAdd={handleAddStrategy}
+              onEdit={handleEditStrategy}
+              onDelete={deleteStrategy}
             />
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Strategy form dialog */}

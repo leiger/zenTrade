@@ -63,6 +63,17 @@ CREATE TABLE IF NOT EXISTS xmonitor_api_health (
     response_time_ms INTEGER,
     checked_at      TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS xmonitor_historical_posts (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    platform_id    TEXT NOT NULL,
+    content        TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    imported_at    TEXT NOT NULL,
+    metrics        TEXT,
+    raw_data       TEXT NOT NULL
+);
 """
 
 SEED_STRATEGIES = """
@@ -309,3 +320,104 @@ async def delete_push_subscription(db: aiosqlite.Connection, endpoint: str) -> b
 async def list_push_subscriptions(db: aiosqlite.Connection) -> list[dict]:
     rows = await fetchall(db, "SELECT * FROM xmonitor_push_subscriptions")
     return [{"id": r["id"], "endpoint": r["endpoint"], "p256dh": r["p256dh"], "auth": r["auth"], "created_at": r["created_at"]} for r in rows]
+async def save_historical_posts(db: aiosqlite.Connection, posts: list[dict]) -> int:
+    """Save a list of posts to the historical posts table. Returns count of new/updated rows."""
+    count = 0
+    for p in posts:
+        pid = p.get("id")
+        user_id = p.get("userId", "")
+        platform_id = p.get("platformId", "")
+        content = p.get("content", "")
+        created_at = p.get("createdAt", "")
+        imported_at = p.get("importedAt", _now_iso())
+        metrics = json.dumps(p.get("metrics")) if p.get("metrics") else None
+        
+        if not pid:
+            continue
+        
+        await db.execute(
+            """INSERT INTO xmonitor_historical_posts 
+               (id, user_id, platform_id, content, created_at, imported_at, metrics, raw_data)
+               VALUES (?,?,?,?,?,?,?,?)
+               ON CONFLICT(id) DO UPDATE SET
+                   user_id=excluded.user_id,
+                   platform_id=excluded.platform_id,
+                   content=excluded.content,
+                   created_at=excluded.created_at,
+                   imported_at=excluded.imported_at,
+                   metrics=excluded.metrics,
+                   raw_data=excluded.raw_data
+            """,
+            (pid, user_id, platform_id, content, created_at, imported_at, metrics, json.dumps(p)),
+        )
+        count += 1
+    await db.commit()
+    return count
+
+
+async def get_post_activity_matrix(
+    db: aiosqlite.Connection,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict:
+    """Return a 7×24 matrix of post counts by day-of-week × hour.
+
+    Rows: 0=Mon … 6=Sun.  Columns: 0–23 hours.
+    SQLite strftime('%w') yields 0=Sun, so we remap.
+    """
+    where_parts: list[str] = []
+    params: list[str] = []
+    if start_date:
+        where_parts.append("created_at >= ?")
+        params.append(start_date)
+    if end_date:
+        where_parts.append("created_at < ?")
+        params.append(end_date)
+
+    where_clause = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    sql = f"""
+        SELECT
+            CAST(strftime('%w', created_at) AS INTEGER) AS dow,
+            CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+            COUNT(*) AS cnt
+        FROM xmonitor_historical_posts
+        {where_clause}
+        GROUP BY dow, hour
+    """
+    rows = await fetchall(db, sql, tuple(params))
+
+    # Build 7×24 matrix (Mon=0 … Sun=6)
+    matrix = [[0] * 24 for _ in range(7)]
+    sqlite_to_monday = {0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5}
+
+    for r in rows:
+        mapped_dow = sqlite_to_monday[r["dow"]]
+        matrix[mapped_dow][r["hour"]] = r["cnt"]
+
+    day_totals = [sum(row) for row in matrix]
+    hour_totals = [sum(matrix[d][h] for d in range(7)) for h in range(24)]
+    total_posts = sum(day_totals)
+
+    # 5-minute buckets per hour (24 × 12)
+    bucket_sql = f"""
+        SELECT
+            CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+            CAST(strftime('%M', created_at) AS INTEGER) / 5 AS bucket,
+            COUNT(*) AS cnt
+        FROM xmonitor_historical_posts
+        {where_clause}
+        GROUP BY hour, bucket
+    """
+    bucket_rows = await fetchall(db, bucket_sql, tuple(params))
+    minute_buckets: list[list[int]] = [[0] * 12 for _ in range(24)]
+    for r in bucket_rows:
+        minute_buckets[r["hour"]][r["bucket"]] = r["cnt"]
+
+    return {
+        "total_posts": total_posts,
+        "matrix": matrix,
+        "day_totals": day_totals,
+        "hour_totals": hour_totals,
+        "minute_buckets": minute_buckets,
+    }

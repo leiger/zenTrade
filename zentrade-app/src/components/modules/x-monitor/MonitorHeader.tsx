@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ChevronDown, ExternalLink, History, RefreshCw } from 'lucide-react';
+import { ChevronDown, ExternalLink, History, RefreshCw, Download } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 import { fetchPastTrackings } from '@/lib/xmonitor-api';
 import type { MonitorStatus, TrackingPeriod } from '@/types/xmonitor';
 
@@ -20,6 +21,8 @@ interface MonitorHeaderProps {
   onHistory: () => void;
   refreshing: boolean;
   onRefresh: () => void;
+  importing?: boolean;
+  onImport?: () => void;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -82,7 +85,7 @@ function useTimeSince(isoDate: string | null): string {
   return text;
 }
 
-export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onHistory, refreshing, onRefresh }: MonitorHeaderProps) {
+export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onHistory, refreshing, onRefresh, importing, onImport }: MonitorHeaderProps) {
   const [pastTrackings, setPastTrackings] = useState<TrackingPeriod[]>([]);
 
   useEffect(() => {
@@ -101,9 +104,9 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
   })() : '';
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
       {/* Left side: Original Header Info & Stats */}
-      <div className="md:col-span-2 space-y-5 flex flex-col">
+      <div className="flex-1 space-y-5 flex flex-col min-w-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-5">
             {/* Logo container */}
@@ -159,9 +162,21 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
                 <span>TweetCast</span>
               </a>
             </Button>
+            <Button
+              variant="outline"
+              size="xs"
+              className="h-8 gap-1.5 rounded-md"
+              onClick={onImport}
+              disabled={importing}
+            >
+              <Download className={`h-3.5 w-3.5 ${importing ? 'animate-bounce' : ''}`} />
+              <span>{importing ? 'Importing...' : 'Import'}</span>
+            </Button>
           </div>
 
         </div>
+
+        <Separator className="bg-border/50" />
 
         {/* Tracking Period Buttons above stats */}
         <div className="flex flex-wrap items-center gap-2">
@@ -249,9 +264,8 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
 
       {/* Right side: Polymarket Embed */}
       {pmSlug ? (
-        <div className="xl:col-span-1 w-full flex items-center justify-center rounded-2xl overflow-hidden">
+        <div className="w-full lg:w-[380px] h-[300px] flex items-center justify-center rounded-2xl overflow-hidden shrink-0">
           <figure
-            className=""
             id={`polymarket-${pmSlug}`}
             aria-label={`Polymarket prediction market: ${tracking?.title ?? 'Market'}`}
             itemScope
@@ -263,7 +277,8 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
               src={`https://embed.polymarket.com/market?event=${pmSlug}&rotate=true&theme=${resolvedTheme === 'light' ? 'light' : 'dark'}&liveactivity=true&creator=leiger`}
               width="100%"
               height="100%"
-              style={{ border: 0, minHeight: '300px', backgroundColor: 'transparent', colorScheme: resolvedTheme === 'light' ? 'light' : 'dark' }}
+              className='bg-background'
+              style={{ border: 0, minHeight: '300px', colorScheme: resolvedTheme === 'light' ? 'light' : 'dark' }}
               allow="clipboard-write"
               {...({ allowtransparency: 'true' } as any)}
             ></iframe>

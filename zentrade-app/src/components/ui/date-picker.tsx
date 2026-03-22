@@ -59,4 +59,55 @@ function DatePicker({
   );
 }
 
-export { DatePicker };
+interface DateRangePickerProps {
+  from: Date | undefined;
+  to: Date | undefined;
+  onRangeChange: (from: Date | undefined, to: Date | undefined) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+function DateRangePicker({
+  from,
+  to,
+  onRangeChange,
+  placeholder = 'Pick date range',
+  className,
+}: DateRangePickerProps) {
+  const label =
+    from && to
+      ? `${format(from, 'MM/dd')} – ${format(to, 'MM/dd')}`
+      : from
+        ? `${format(from, 'MM/dd')} – …`
+        : placeholder;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            'h-7 justify-start text-left font-normal text-xs gap-1.5',
+            !from && 'text-muted-foreground',
+            className,
+          )}
+        >
+          <CalendarIcon className="h-3 w-3" />
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          selected={from ? { from, to } : undefined}
+          onSelect={(range) => {
+            onRangeChange(range?.from, range?.to);
+          }}
+          numberOfMonths={2}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export { DatePicker, DateRangePicker };

@@ -181,6 +181,38 @@ async def unsubscribe_push(endpoint: str = Query(...)):
         await db.close()
 
 
+@router.get("/posts/stats")
+async def get_post_stats(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+):
+    """Day-of-week × hour activity matrix from historical posts."""
+    from app.xmonitor.database import get_post_activity_matrix
+    db = await get_db()
+    try:
+        return await get_post_activity_matrix(db, start_date, end_date)
+    finally:
+        await db.close()
+
+
+@router.post("/import-tweets")
+async def import_musk_tweets():
+    """Fetch all available tweets for Elon Musk and store them in the DB."""
+    from app.xmonitor.clients import xtracker_get_posts
+    from app.xmonitor.database import save_historical_posts
+    try:
+        posts = await xtracker_get_posts(handle="elonmusk")
+        db = await get_db()
+        try:
+            count = await save_historical_posts(db, posts)
+            return {"status": "ok", "imported": count}
+        finally:
+            await db.close()
+    except Exception as e:
+        logger.error(f"Failed to import tweets: {e}")
+        raise HTTPException(502, f"Import failed: {e}")
+
+
 # ── WebSocket ─────────────────────────────────────────────
 
 @router.websocket("/ws")
