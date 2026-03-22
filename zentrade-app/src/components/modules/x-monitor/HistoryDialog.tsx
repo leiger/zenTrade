@@ -56,7 +56,7 @@ export function HistoryDialog({ open, onOpenChange, onFeedback }: HistoryDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-oswald flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
             Alert History
           </DialogTitle>

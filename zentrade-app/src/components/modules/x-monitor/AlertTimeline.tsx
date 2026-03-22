@@ -154,7 +154,7 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
                             <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-widest leading-none">
                               {STRATEGY_TYPE_LABELS[alert.strategyType]}
                             </span>
-                            <span className="text-[13px] font-oswald text-foreground tabular-nums tracking-tight leading-none" suppressHydrationWarning>
+                            <span className="text-[13px] text-foreground tabular-nums tracking-tight leading-none" suppressHydrationWarning>
                               {format(new Date(alert.createdAt), 'HH:mm')}
                             </span>
                           </div>

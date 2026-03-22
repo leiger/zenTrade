@@ -55,7 +55,7 @@ export default function AssetsPage() {
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
           <Wallet className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight font-oswald">Assets Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Assets Dashboard</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           用数量维护真实持仓，系统按 USD 实时估值，并保留 adjustment 与估值快照。
@@ -91,7 +91,7 @@ export default function AssetsPage() {
                 <Landmark className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="space-y-1">
-                <p className="text-xl font-oswald tabular-nums tracking-wide">{formatUsd(asset.marketValueUsd)}</p>
+                <p className="text-xl tabular-nums tracking-wide">{formatUsd(asset.marketValueUsd)}</p>
                 <p className="text-xs text-muted-foreground">
                   数量 {formatNumber(asset.totalQuantity)} / {asset.accountsCount} 个账户
                 </p>

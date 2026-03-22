@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings, Inbox, Wallet, Radio } from 'lucide-react';
 import { ModeToggle } from '@/components/shared/ModeToggle';
+import { ThemeSwitcher } from '@/components/themes/theme-switcher';
 import { useThesisStore } from '@/lib/store';
 import { getReminderSummary } from '@/lib/thesis-tracker';
 import {
@@ -61,11 +62,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
         <div className="flex items-center gap-2.5 px-2 py-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-bebas-neue text-sm">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-semibold">
             Z
           </div>
           <div className="flex flex-col gap-0.5 leading-none">
-            <span className="font-bebas-neue text-base tracking-wide">ZenTrade</span>
+            <span className="text-base font-semibold tracking-wide">ZenTrade</span>
             <span className="text-[10px] text-muted-foreground">认知交易系统</span>
           </div>
         </div>
@@ -89,7 +90,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       tooltip={item.name}
                       disabled={item.disabled}
                     >
-                      <Link href={item.disabled ? '#' : item.href} className="font-oswald tracking-wide">
+                      <Link href={item.disabled ? '#' : item.href} className="tracking-wide">
                         <Icon />
                         <span>{item.name}</span>
                       </Link>
@@ -110,7 +111,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <div className="flex items-center justify-between px-2 pt-2 border-t w-full">
           <span className="text-[10px] text-muted-foreground font-medium">ZenTrade v1.0</span>
-          <ModeToggle />
+          <div className="flex items-center gap-0.5">
+            <ThemeSwitcher />
+            <ModeToggle />
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

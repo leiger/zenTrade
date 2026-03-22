@@ -38,7 +38,7 @@ export function StrategyList({ strategies, onToggle, onAdd, onEdit, onDelete }: 
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <h2 className="text-lg font-semibold font-oswald">Active Strategies</h2>
+          <h2 className="text-lg font-semibold">Active Strategies</h2>
           <p className="text-xs text-muted-foreground">
             {activeCount} of {strategies.length} strategies enabled
           </p>

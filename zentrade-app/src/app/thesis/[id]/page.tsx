@@ -269,7 +269,7 @@ export default function ThesisDetailPage() {
           {catConfig?.icon ?? '📁'}
         </div>
         <div className="flex-1 min-w-0 space-y-1.5">
-          <h1 className="text-xl font-bold tracking-tight leading-tight font-oswald">{thesis.name}</h1>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">{thesis.name}</h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {assetDisplayName && (
               <Badge variant="secondary" className="text-xs font-normal gap-1">
@@ -298,7 +298,7 @@ export default function ThesisDetailPage() {
         <div className="flex items-center gap-5 flex-shrink-0 pt-1">
           <div className="flex flex-col items-center min-w-[60px]">
             <p className="text-xs text-muted-foreground mb-1">快照</p>
-            <div className="inline-flex items-center gap-1.5 text-2xl font-oswald tracking-wide">
+            <div className="inline-flex items-center gap-1.5 text-2xl tracking-wide">
               <MessageSquareText className="h-4 w-4 text-muted-foreground" />
               {snapshotCount}
             </div>
@@ -313,14 +313,14 @@ export default function ThesisDetailPage() {
                   <p className="text-xs text-muted-foreground mb-1">正确率</p>
                   {accuracyRate !== null ? (
                     <div className={cn(
-                      'inline-flex items-center gap-1.5 text-2xl font-oswald tracking-wide',
+                      'inline-flex items-center gap-1.5 text-2xl tracking-wide',
                       accuracyRate >= 60 ? 'text-emerald-500' : accuracyRate >= 40 ? 'text-amber-500' : 'text-rose-500'
                     )}>
                       <Target className="h-4 w-4" />
                       {accuracyRate}%
                     </div>
                   ) : (
-                    <div className="inline-flex items-center gap-1.5 text-2xl font-oswald tracking-wide text-muted-foreground/40">
+                    <div className="inline-flex items-center gap-1.5 text-2xl tracking-wide text-muted-foreground/40">
                       <Target className="h-4 w-4" />
                       —
                     </div>

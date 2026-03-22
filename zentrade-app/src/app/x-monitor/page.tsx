@@ -181,7 +181,7 @@ function XMonitorContent() {
         {/* Alert section */}
         <div className="space-y-3">
           <div className="space-y-0.5">
-            <h2 className="text-lg font-semibold font-oswald">Strategy Alerts</h2>
+            <h2 className="text-lg font-semibold">Strategy Alerts</h2>
             <p className="text-xs text-muted-foreground">
               Real-time alerts from active strategies. Give Yes/No feedback to iterate.
             </p>

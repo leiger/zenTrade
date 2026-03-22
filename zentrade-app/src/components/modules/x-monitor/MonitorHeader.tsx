@@ -85,7 +85,7 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <Radio className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight font-oswald">X Monitor</h1>
+            <h1 className="text-2xl font-bold tracking-tight">X Monitor</h1>
             <span className="text-sm text-muted-foreground">—</span>
             <a
               href={`https://x.com/${status.userHandle}`}
@@ -211,7 +211,7 @@ function StatCard({ icon, iconBg, label, value, sub }: {
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
         <div className="flex items-baseline gap-1.5">
-          <p className="text-lg font-oswald tabular-nums tracking-wide leading-none">{value}</p>
+          <p className="text-lg tabular-nums tracking-wide leading-none">{value}</p>
           {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
         </div>
       </div>

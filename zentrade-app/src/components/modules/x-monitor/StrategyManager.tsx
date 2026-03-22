@@ -87,7 +87,7 @@ export function StrategyManager({ open, onOpenChange, editing, onSave }: Strateg
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-oswald">
+          <DialogTitle>
             {editing ? 'Edit Strategy' : 'New Strategy'}
           </DialogTitle>
           <DialogDescription>
