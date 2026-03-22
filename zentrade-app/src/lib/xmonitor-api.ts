@@ -4,6 +4,7 @@ import type {
   MonitorStatus,
   StrategyInstance,
   StrategyType,
+  TrackingPeriod,
 } from '@/types/xmonitor';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -103,6 +104,11 @@ function mapAlert(a: Record<string, unknown>): MonitorAlert {
 export async function fetchMonitorStatus(): Promise<MonitorStatus> {
   const raw = await req<Record<string, unknown>>('/xmonitor/status');
   return mapStatus(raw);
+}
+
+export async function fetchPastTrackings(): Promise<TrackingPeriod[]> {
+  const raw = await req<Record<string, unknown>[]>('/xmonitor/trackings/history');
+  return raw.map(mapTracking);
 }
 
 export async function fetchAlerts(

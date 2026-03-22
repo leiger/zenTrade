@@ -110,9 +110,13 @@ function XMonitorContent() {
     return () => ws.close();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredAlerts = alertFilter
-    ? alerts.filter((a) => a.strategyType === alertFilter)
-    : alerts;
+  const effectiveTrackingId = selectedTrackingId ?? status?.activeTrackings?.[0]?.id;
+  
+  const filteredAlerts = alerts.filter((a) => {
+    if (effectiveTrackingId && a.trackingId !== effectiveTrackingId) return false;
+    if (alertFilter && a.strategyType !== alertFilter) return false;
+    return true;
+  });
 
   const handleFilterChange = useCallback(
     (value: string) => setAlertFilter(value === 'all' ? null : (value as StrategyType)),

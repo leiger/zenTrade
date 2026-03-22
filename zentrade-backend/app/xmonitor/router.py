@@ -39,6 +39,16 @@ async def manual_refresh():
     await poller.manual_refresh()
     return poller._build_status_data()
 
+@router.get("/trackings/history")
+async def get_historical_trackings_api():
+    """Get past trackings that have associated alerts."""
+    from app.xmonitor.database import get_historical_trackings
+    db = await get_db()
+    try:
+        return await get_historical_trackings(db)
+    finally:
+        await db.close()
+
 
 @router.get("/posts")
 async def get_posts(tracking_id: Optional[str] = Query(None)):

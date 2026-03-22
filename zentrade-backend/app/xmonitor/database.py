@@ -21,6 +21,16 @@ CREATE TABLE IF NOT EXISTS xmonitor_strategy_instances (
     updated_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS xmonitor_trackings (
+    id             TEXT PRIMARY KEY,
+    title          TEXT NOT NULL,
+    start_date     TEXT NOT NULL,
+    end_date       TEXT NOT NULL,
+    market_link    TEXT,
+    is_active      INTEGER NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS xmonitor_alerts (
     id                     TEXT PRIMARY KEY,
     strategy_instance_id   TEXT NOT NULL REFERENCES xmonitor_strategy_instances(id) ON DELETE CASCADE,
@@ -155,6 +165,55 @@ def _row_to_strategy(r: aiosqlite.Row) -> dict:
         "updated_at": r["updated_at"],
     }
 
+
+# ── Trackings ─────────────────────────────────────────────
+
+async def upsert_tracking(
+    db: aiosqlite.Connection,
+    tracking_id: str,
+    title: str,
+    start_date: str,
+    end_date: str,
+    market_link: str | None,
+    is_active: bool
+) -> None:
+    now = _now_iso()
+    await db.execute(
+        """INSERT INTO xmonitor_trackings (id, title, start_date, end_date, market_link, is_active, updated_at)
+        VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET
+            title=excluded.title,
+            start_date=excluded.start_date,
+            end_date=excluded.end_date,
+            market_link=excluded.market_link,
+            is_active=excluded.is_active,
+            updated_at=excluded.updated_at
+        """,
+        (tracking_id, title, start_date, end_date, market_link, 1 if is_active else 0, now),
+    )
+    await db.commit()
+
+async def get_historical_trackings(db: aiosqlite.Connection) -> list[dict]:
+    # Only return trackings that have fired alerts (INNER JOIN)
+    # They can be grouped by tracking id to avoid duplicates
+    sql = """
+        SELECT t.*
+        FROM xmonitor_trackings t
+        INNER JOIN xmonitor_alerts a ON t.id = a.tracking_id
+        GROUP BY t.id
+        ORDER BY t.start_date DESC
+    """
+    rows = await fetchall(db, sql)
+    return [
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "startDate": r["start_date"],
+            "endDate": r["end_date"],
+            "marketLink": r["market_link"],
+            "isActive": bool(r["is_active"]),
+        } for r in rows
+    ]
 
 # ── Alert Queries ─────────────────────────────────────────
 

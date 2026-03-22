@@ -13,6 +13,7 @@ from app.xmonitor.database import (
     create_alert,
     list_push_subscriptions,
     list_strategies,
+    upsert_tracking,
 )
 from app.xmonitor.models import ApiHealthStatus
 from app.xmonitor.strategy import StrategyEngine
@@ -143,31 +144,45 @@ class XMonitorPoller:
             self.api_health.xtracker_last_success = datetime.now(timezone.utc).isoformat()
 
             # Fetch posts and stats for EACH tracking
-            for t in self.active_trackings:
-                tid = t.get("id", "")
-                start_date = t.get("startDate", "")
-                end_date = t.get("endDate", "")
+            db = await get_db()
+            try:
+                for t in self.active_trackings:
+                    tid = t.get("id", "")
+                    start_date = t.get("startDate", "")
+                    end_date = t.get("endDate", "")
 
-                try:
-                    posts = await clients.xtracker_get_posts("elonmusk", start_date, end_date)
-                    self.tracking_posts[tid] = posts
-                    self.tracking_post_count[tid] = len(posts)
+                    await upsert_tracking(
+                        db,
+                        tracking_id=tid,
+                        title=t.get("title", ""),
+                        start_date=start_date,
+                        end_date=end_date,
+                        market_link=t.get("marketLink"),
+                        is_active=t.get("isActive", True)
+                    )
 
-                    if posts:
-                        latest = max(posts, key=lambda p: p.get("createdAt", ""))
-                        self.tracking_last_post_at[tid] = datetime.fromisoformat(
-                            latest["createdAt"].replace("Z", "+00:00")
-                        )
-                    else:
-                        self.tracking_last_post_at[tid] = None
-                except Exception as e:
-                    logger.warning("Failed to fetch posts for tracking %s: %s", tid, e)
+                    try:
+                        posts = await clients.xtracker_get_posts("elonmusk", start_date, end_date)
+                        self.tracking_posts[tid] = posts
+                        self.tracking_post_count[tid] = len(posts)
 
-                try:
-                    stats = await clients.xtracker_get_tracking(tid)
-                    t["_stats"] = stats.get("stats", {})
-                except Exception:
-                    pass
+                        if posts:
+                            latest = max(posts, key=lambda p: p.get("createdAt", ""))
+                            self.tracking_last_post_at[tid] = datetime.fromisoformat(
+                                latest["createdAt"].replace("Z", "+00:00")
+                            )
+                        else:
+                            self.tracking_last_post_at[tid] = None
+                    except Exception as e:
+                        logger.warning("Failed to fetch posts for tracking %s: %s", tid, e)
+
+                    try:
+                        stats = await clients.xtracker_get_tracking(tid)
+                        t["_stats"] = stats.get("stats", {})
+                    except Exception:
+                        pass
+            finally:
+                await db.close()
 
             self.last_polled_at = datetime.now(timezone.utc)
 
