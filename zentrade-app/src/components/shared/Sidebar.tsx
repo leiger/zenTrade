@@ -30,7 +30,7 @@ const navigation = [
     ],
   },
   {
-    label: '核心功能',
+    label: 'Core',
     items: [
       { name: 'Assets', href: '/assets', icon: Wallet, disabled: false },
       { name: 'Analytics', href: '/analytics', icon: BarChart3, disabled: false },

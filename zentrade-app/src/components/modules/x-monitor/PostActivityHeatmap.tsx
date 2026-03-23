@@ -41,6 +41,63 @@ function cellColor(value: number, max: number): string {
   return 'bg-amber-600/15 text-foreground/50';
 }
 
+/* ── Timezone helpers ──────────────────────────────────────── */
+
+type TzKey = 'utc' | 'cn' | 'et';
+
+const TZ_META: Record<TzKey, { label: string; iana: string }> = {
+  utc: { label: 'UTC', iana: 'UTC' },
+  cn: { label: 'UTC+8', iana: 'Asia/Shanghai' },
+  et: { label: 'ET', iana: 'America/New_York' },
+};
+
+function getTzOffset(iana: string): number {
+  const now = new Date();
+  const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC' });
+  const tzStr = now.toLocaleString('en-US', { timeZone: iana });
+  return Math.round((new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 3_600_000);
+}
+
+function shiftStatsForTz(stats: PostActivityStats, offset: number): PostActivityStats {
+  if (offset === 0) return stats;
+
+  const matrix: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (let d = 0; d < 7; d++) {
+    for (let h = 0; h < 24; h++) {
+      const newH = ((h + offset) % 24 + 24) % 24;
+      const newD = ((d + Math.floor((h + offset) / 24)) % 7 + 7) % 7;
+      matrix[newD][newH] += stats.matrix[d][h];
+    }
+  }
+
+  const hourTotals = Array(24).fill(0) as number[];
+  const minuteBuckets: number[][] = Array.from({ length: 24 }, () => Array(12).fill(0));
+  for (let h = 0; h < 24; h++) {
+    const newH = ((h + offset) % 24 + 24) % 24;
+    hourTotals[newH] += stats.hour_totals[h];
+    for (let b = 0; b < 12; b++) {
+      minuteBuckets[newH][b] += stats.minute_buckets[h][b];
+    }
+  }
+
+  return {
+    total_posts: stats.total_posts,
+    matrix,
+    day_totals: matrix.map((row) => row.reduce((a, b) => a + b, 0)),
+    hour_totals: hourTotals,
+    minute_buckets: minuteBuckets,
+  };
+}
+
+function getNowInTz(offset: number): { day: number; hour: number } {
+  const now = new Date();
+  const adjusted = now.getUTCHours() + offset;
+  return {
+    hour: ((adjusted % 24) + 24) % 24,
+    day: (((now.getUTCDay() + 6) % 7) + Math.floor(adjusted / 24) + 7) % 7,
+  };
+}
+
 export function PostActivityHeatmap() {
   const [preset, setPreset] = useState<Preset>('7d');
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
@@ -48,6 +105,7 @@ export function PostActivityHeatmap() {
   const [isCustom, setIsCustom] = useState(false);
   const [stats, setStats] = useState<PostActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tzKey, setTzKey] = useState<TzKey>('cn');
 
   const status = useXMonitorStore((s) => s.status);
   const lastPolledAt = status?.lastPolledAt;
@@ -64,6 +122,14 @@ export function PostActivityHeatmap() {
     }
   }, []);
 
+  // Calendar gives midnight of selected day; shift end to start of next day (exclusive upper bound)
+  const customEndExclusive = useMemo(() => {
+    if (!customTo) return undefined;
+    const d = new Date(customTo);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }, [customTo]);
+
   // Load on mount and whenever preset or data updates
   useEffect(() => {
     if (isCustom) return;
@@ -73,13 +139,15 @@ export function PostActivityHeatmap() {
 
   // Load when custom range or data updates
   useEffect(() => {
-    if (!isCustom || !customFrom || !customTo) return;
-    loadStats(customFrom.toISOString(), customTo.toISOString());
-  }, [isCustom, customFrom, customTo, loadStats, lastPolledAt]);
+    if (!isCustom || !customFrom || !customEndExclusive) return;
+    loadStats(customFrom.toISOString(), customEndExclusive.toISOString());
+  }, [isCustom, customFrom, customEndExclusive, loadStats, lastPolledAt]);
 
   const handlePreset = (p: Preset) => {
     setIsCustom(false);
     setPreset(p);
+    setCustomFrom(undefined);
+    setCustomTo(undefined);
   };
 
   const handleRangeChange = (from: Date | undefined, to: Date | undefined) => {
@@ -90,11 +158,17 @@ export function PostActivityHeatmap() {
     }
   };
 
+  const tzOffset = useMemo(() => getTzOffset(TZ_META[tzKey].iana), [tzKey]);
+  const shiftedStats = useMemo(
+    () => (stats ? shiftStatsForTz(stats, tzOffset) : null),
+    [stats, tzOffset]
+  );
+
   const rangeLabel =
     isCustom && customFrom && customTo ? `Custom Range` : getPresetRange(preset).label;
 
-  const maxVal = stats ? Math.max(...stats.matrix.flat(), 1) : 1;
-  const maxHourVal = stats ? Math.max(...stats.hour_totals, 1) : 1;
+  const maxVal = shiftedStats ? Math.max(...shiftedStats.matrix.flat(), 1) : 1;
+  const maxHourVal = shiftedStats ? Math.max(...shiftedStats.hour_totals, 1) : 1;
 
   return (
     <div className="space-y-4">
@@ -142,7 +216,7 @@ export function PostActivityHeatmap() {
         <div className="flex items-center justify-center min-h-[200px]">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
         </div>
-      ) : stats ? (
+      ) : shiftedStats ? (
         <Tabs defaultValue="day-hour" className="w-full gap-1">
           <div className="flex items-center justify-between gap-3">
             <TabsList className="!h-6 p-0.5">
@@ -156,21 +230,40 @@ export function PostActivityHeatmap() {
                 Timeline
               </TabsTrigger>
             </TabsList>
-            <ClockDisplay />
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
+                {(['utc', 'cn', 'et'] as TzKey[]).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setTzKey(k)}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[10px] font-medium transition-all',
+                      tzKey === k
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {TZ_META[k].label}
+                  </button>
+                ))}
+              </div>
+              <ClockDisplay tzKey={tzKey} />
+            </div>
           </div>
 
           <TabsContent value="day-hour" className="mt-3">
-            <DayHourMatrix stats={stats} maxVal={maxVal} />
+            <DayHourMatrix stats={shiftedStats} maxVal={maxVal} tzOffset={tzOffset} />
           </TabsContent>
 
           <TabsContent value="hourly" className="mt-3">
-            <HourlyHeatmap stats={stats} maxVal={maxHourVal} />
+            <HourlyHeatmap stats={shiftedStats} maxVal={maxHourVal} tzOffset={tzOffset} />
           </TabsContent>
 
           <TabsContent value="timeline" className="mt-3">
             <PostTimeline
               startDate={isCustom ? customFrom?.toISOString() : getPresetRange(preset).start}
-              endDate={isCustom ? customTo?.toISOString() : getPresetRange(preset).end}
+              endDate={isCustom ? customEndExclusive?.toISOString() : getPresetRange(preset).end}
             />
           </TabsContent>
         </Tabs>
@@ -181,10 +274,16 @@ export function PostActivityHeatmap() {
 
 /* ── Day × Hour Matrix ──────────────────────────────────── */
 
-function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: number }) {
-  const now = new Date();
-  const nowDay = (now.getUTCDay() + 6) % 7; // Monday=0 ... Sunday=6 (UTC)
-  const nowHour = now.getUTCHours();
+function DayHourMatrix({
+  stats,
+  maxVal,
+  tzOffset,
+}: {
+  stats: PostActivityStats;
+  maxVal: number;
+  tzOffset: number;
+}) {
+  const { day: nowDay, hour: nowHour } = getNowInTz(tzOffset);
 
   return (
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
@@ -275,9 +374,17 @@ const BUCKET_LABELS = Array.from({ length: 12 }, (_, i) => {
   return `${start}–${end}`;
 });
 
-function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: number }) {
+function HourlyHeatmap({
+  stats,
+  maxVal,
+  tzOffset,
+}: {
+  stats: PostActivityStats;
+  maxVal: number;
+  tzOffset: number;
+}) {
   const [hoveredHour, setHoveredHour] = useState<number | null>(null);
-  const nowHour = new Date().getUTCHours();
+  const { hour: nowHour } = getNowInTz(tzOffset);
 
   return (
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
@@ -469,15 +576,9 @@ function BucketDetail({
   );
 }
 
-/* ── Clock Display (UTC + Local) ──────────────────────────── */
+/* ── Clock Display ────────────────────────────────────────── */
 
-function formatTime(date: Date, utc: boolean): string {
-  const h = utc ? date.getUTCHours() : date.getHours();
-  const m = utc ? date.getUTCMinutes() : date.getMinutes();
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function ClockDisplay() {
+function ClockDisplay({ tzKey }: { tzKey: TzKey }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -485,25 +586,34 @@ function ClockDisplay() {
     return () => clearInterval(id);
   }, []);
 
-  const localTz = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop()?.replace(/_/g, ' ') ?? '';
-    } catch {
-      return '';
-    }
-  }, []);
+  const fmt = (iana: string) =>
+    now.toLocaleTimeString('en-US', {
+      timeZone: iana,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+  const keys: TzKey[] = ['utc', 'cn', 'et'];
 
   return (
     <div className="flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground shrink-0">
-      <span>
-        <span className="font-semibold text-primary">UTC</span>{' '}
-        {formatTime(now, true)}
-      </span>
-      <span className="text-border">·</span>
-      <span>
-        <span className="font-semibold text-foreground/70">{localTz}</span>{' '}
-        {formatTime(now, false)}
-      </span>
+      {keys.map((k, i) => (
+        <span key={k} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-border">·</span>}
+          <span>
+            <span
+              className={cn(
+                'font-semibold',
+                k === tzKey ? 'text-primary' : 'text-foreground/70'
+              )}
+            >
+              {TZ_META[k].label}
+            </span>{' '}
+            {fmt(TZ_META[k].iana)}
+          </span>
+        </span>
+      ))}
     </div>
   );
 }

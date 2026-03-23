@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,6 @@ import { THEMES } from './theme-config';
 import { cn } from '@/lib/utils';
 
 const THEME_COLORS: Record<string, { light: string; dark: string }> = {
-  default: { light: 'bg-zinc-900', dark: 'bg-zinc-100' },
   claude: { light: 'bg-[#c46a30]', dark: 'bg-[#c46a30]' },
   vercel: { light: 'bg-black', dark: 'bg-white' },
   supabase: { light: 'bg-[#3ecf8e]', dark: 'bg-[#3ecf8e]' },
@@ -23,9 +23,15 @@ const THEME_COLORS: Record<string, { light: string; dark: string }> = {
 
 export function ThemeSwitcher() {
   const { activeTheme, setActiveTheme } = useThemeConfig();
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: typeof activeTheme) => {
+    setActiveTheme(value);
+    setOpen(false);
+  };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Palette className="h-[1.2rem] w-[1.2rem]" />
@@ -47,7 +53,7 @@ export function ThemeSwitcher() {
             return (
               <button
                 key={theme.value}
-                onClick={() => setActiveTheme(theme.value)}
+                onClick={() => handleSelect(theme.value)}
                 className={cn(
                   'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
                   'hover:bg-accent hover:text-accent-foreground',
