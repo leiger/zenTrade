@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BrainCircuit, Shield, BarChart3, Settings, Inbox, Wallet, Radio } from 'lucide-react';
+import { BrainCircuit, BarChart3, Inbox, Wallet, Radio, ScanSearch } from 'lucide-react';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { ThemeSwitcher } from '@/components/themes/theme-switcher';
 import { useThesisStore } from '@/lib/store';
@@ -23,23 +23,25 @@ import {
 
 const navigation = [
   {
-    label: '总览',
-    items: [{ name: 'Dashboard', href: '/', icon: LayoutDashboard, disabled: true }],
+    label: 'Polymarket',
+    items: [
+      { name: 'X Monitor', href: '/x-monitor', icon: Radio, disabled: false },
+      { name: 'Wallet Tracker', href: '/wallet-tracker', icon: ScanSearch, disabled: false },
+    ],
   },
   {
     label: '核心功能',
     items: [
       { name: 'Assets', href: '/assets', icon: Wallet, disabled: false },
-      { name: 'X Monitor', href: '/x-monitor', icon: Radio, disabled: false },
-      { name: 'Thesis Tracker', href: '/thesis', icon: BrainCircuit, disabled: false },
-      { name: 'Review Inbox', href: '/review', icon: Inbox, disabled: false },
-      { name: 'Decision Firewall', href: '/firewall', icon: Shield, disabled: true },
       { name: 'Analytics', href: '/analytics', icon: BarChart3, disabled: false },
     ],
   },
   {
-    label: '系统',
-    items: [{ name: 'Settings', href: '/settings', icon: Settings, disabled: true }],
+    label: 'Review',
+    items: [
+      { name: 'Thesis Tracker', href: '/thesis', icon: BrainCircuit, disabled: false },
+      { name: 'Review Inbox', href: '/review', icon: Inbox, disabled: false },
+    ],
   },
 ];
 

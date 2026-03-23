@@ -50,44 +50,53 @@ flowchart LR
 
 ## 后端设计
 
-### 新增路由
+### 路由一览（已实现）
 
 **监控数据**：
 
-- `GET /api/xmonitor/status` -- 当前监控状态（发帖计数、距上次发帖时间、剩余时间、pace、活跃 tracking 列表、API 健康状态）
-- `GET /api/xmonitor/markets` -- 活跃市场列表 + 各 bracket 价格（含 Polymarket 下单链接）
-- `GET /api/xmonitor/tracking/{id}` -- 某个 tracking period 的详细统计
-- `GET /api/xmonitor/posts` -- 近期推文列表
+- `GET /api/xmonitor/status` -- 当前监控快照（发帖计数、距上次发帖时间、剩余时间、pace、活跃 tracking 列表、API 健康状态），纯读内存缓存
+- `POST /api/xmonitor/refresh` -- 手动触发一轮轮询（拉 XTracker + Polymarket + 跑策略评估），已在刷新时幂等跳过，响应格式同 status
+- `GET /api/xmonitor/markets` -- 活跃市场 Polymarket bracket 价格（内存），按 tracking_id 索引，每项含 brackets 列表（question, yes/no price, volume 等）
+- `GET /api/xmonitor/tracking/{id}` -- 透传 XTracker 单个 tracking 详情（含 includeStats=true），异常返回 502
+- `GET /api/xmonitor/posts` -- 某 tracking 的近期帖子（内存缓存），可选 query `tracking_id`，缺省取距结算最近的 tracking
+- `GET /api/xmonitor/trackings/history` -- 至少产生过一条 alert 的 tracking 列表（DB JOIN 查询），按 start_date DESC
+
+**历史数据（Phase 2 Heatmap 支撑）**：
+
+- `GET /api/xmonitor/posts/history` -- 从本地库 `xmonitor_historical_posts` 分页读历史帖，支持 `limit`（默认 50，最大 100）、`offset`、`start_date`、`end_date` 过滤
+- `GET /api/xmonitor/posts/stats` -- 基于历史帖的「星期×小时」活跃度矩阵（7×24）及汇总，含 `minute_buckets`（24×12，每小时 12 个 5 分钟桶），支持 `start_date`/`end_date` 过滤
+- `POST /api/xmonitor/import-tweets` -- 从 XTracker 拉取 elonmusk 帖子写入历史库（upsert），响应 `{"status": "ok", "imported": <int>}`
 
 **策略管理 CRUD**：
 
-- `GET /api/xmonitor/strategies` -- 所有策略实例列表
-- `POST /api/xmonitor/strategies` -- 创建策略实例（选择模板 + 设参数）
-- `PUT /api/xmonitor/strategies/{id}` -- 更新策略实例参数/启停状态
-- `DELETE /api/xmonitor/strategies/{id}` -- 删除策略实例
+- `GET /api/xmonitor/strategies` -- 所有策略实例列表，按 created_at 排序
+- `POST /api/xmonitor/strategies` -- 创建策略实例（选择模板 + 设参数），响应 201
+- `PUT /api/xmonitor/strategies/{id}` -- 部分更新策略实例（仅非 null 字段写入），禁用时清除节流状态
+- `DELETE /api/xmonitor/strategies/{id}` -- 删除策略实例（级联删除关联 alerts），响应 204
 
 **告警**：
 
-- `GET /api/xmonitor/alerts` -- 告警历史（支持分页、按 strategy_instance_id / strategy_type 过滤）
-- `POST /api/xmonitor/alerts/{id}/feedback` -- 对告警的 yes/no 反馈（含可选 note）
+- `GET /api/xmonitor/alerts` -- 分页查询告警历史，支持 `strategy_type` 过滤、`limit`（默认 50，最大 200）、`offset`
+- `POST /api/xmonitor/alerts/{id}/feedback` -- 对告警的 yes/no 反馈（含可选 feedback_note），写入 feedback_at 时间戳
 
 **推送**：
 
-- `POST /api/xmonitor/push/subscribe` -- 注册浏览器推送订阅
-- `DELETE /api/xmonitor/push/subscribe` -- 取消推送订阅
+- `GET /api/xmonitor/push/vapid-key` -- 返回 Web Push VAPID 公钥，未配置返回 503
+- `POST /api/xmonitor/push/subscribe` -- 注册/覆盖浏览器推送订阅（按 endpoint 唯一约束 upsert），响应 201
+- `DELETE /api/xmonitor/push/subscribe` -- 按 endpoint 删除订阅，响应 204
 
 **WebSocket**：
 
-- `WS /api/xmonitor/ws` -- 实时推送（新推文、统计变更、新告警、API 健康状态变更）
+- `WS /api/xmonitor/ws` -- 实时推送（`status_update` / `new_alert` / `market_update` / `api_health_change`），服务端单向推送文本帧 `{"type": ..., "data": ...}`
 
 ### Background Poller + API Health Monitor
 
-使用 `asyncio` 后台任务或 `APScheduler`，在 FastAPI 启动时注册：
+使用 `asyncio` 后台任务，在 FastAPI 启动时注册（`XMonitorPoller`）：
 
-- 每 2-3 分钟轮询 XTracker `/users/elonmusk/posts` + `/trackings/{active_id}?includeStats=true`
-- 每 5 分钟轮询 Polymarket Gamma API（获取 bracket 价格）
-- 数据缓存在内存 + 持久化到 SQLite
-- 每次轮询后执行 Strategy Engine 评估
+- 约 150s 轮询 XTracker（拉 active trackings + 各 tracking 的 posts）
+- 约 300s 轮询 Polymarket Gamma API（获取 bracket 价格）
+- 数据缓存在内存（`active_trackings` / `tracking_posts` / `market_data`）+ 帖子持久化到 SQLite `xmonitor_historical_posts`
+- 每次轮询后执行 Strategy Engine 评估，触发告警时写库 + Web Push + WebSocket 广播
 - 变更时通过 WebSocket 推送到前端
 
 **API 健康检测**：
@@ -207,7 +216,7 @@ class MonitorAlert:
     feedback_at: datetime | None
     push_sent: bool
 
-# xmonitor_api_health - API 健康日志
+# xmonitor_api_health - API 健康日志（表已定义但当前未读写，健康状态在内存 ApiHealthStatus）
 class ApiHealthLog:
     id: str
     api_name: str              # "xtracker" | "polymarket"
@@ -215,6 +224,26 @@ class ApiHealthLog:
     error_message: str | None
     response_time_ms: int | None
     checked_at: datetime
+
+# xmonitor_historical_posts - 历史帖子（轮询自动写入 + import-tweets 导入）
+class HistoricalPost:
+    id: str
+    user_id: str
+    platform_id: str           # XTracker post ID
+    content: str
+    created_at: str            # ISO datetime
+    imported_at: str           # ISO datetime
+    metrics: dict | None       # JSON - likes, retweets etc.
+    raw_data: dict             # complete XTracker post JSON
+
+# xmonitor_trackings - 从 XTracker 同步的 tracking 元数据
+class TrackingRecord:
+    id: str
+    title: str
+    start_date: str
+    end_date: str
+    market_link: str | None
+    is_active: bool
 ```
 
 ### Web Push 实现
@@ -404,3 +433,6 @@ Phase 2（数据丰富 + 体验优化）:
 - Market Brackets 价格展示（热力图/列表）
 - Post Timeline 每小时发帖柱状图
 - 历史告警回顾 + 策略表现统计
+- ✅ 历史帖子导入 (`POST /import-tweets`) + 分页查询 (`GET /posts/history`)
+- ✅ 发帖活跃度热力图数据 (`GET /posts/stats` — 7×24 星期×小时矩阵 + 5 分钟粒度 minute_buckets)
+- ✅ Tracking 历史列表 (`GET /trackings/history` — 产生过 alert 的 tracking)

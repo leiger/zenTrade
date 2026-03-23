@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { subDays } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DateRangePicker } from '@/components/ui/date-picker';
@@ -42,7 +42,7 @@ function cellColor(value: number, max: number): string {
 }
 
 export function PostActivityHeatmap() {
-  const [preset, setPreset] = useState<Preset>('all');
+  const [preset, setPreset] = useState<Preset>('7d');
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [isCustom, setIsCustom] = useState(false);
@@ -143,18 +143,21 @@ export function PostActivityHeatmap() {
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
         </div>
       ) : stats ? (
-        <Tabs defaultValue="day-hour" className="w-full">
-          <TabsList className="h-6">
-            <TabsTrigger value="day-hour" className="text-xs px-3 h-5">
-              Day × Hour
-            </TabsTrigger>
-            <TabsTrigger value="hourly" className="text-xs px-3 h-5">
-              Hourly Heatmap
-            </TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs px-3 h-5">
-              Timeline
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="day-hour" className="w-full gap-1">
+          <div className="flex items-center justify-between gap-3">
+            <TabsList className="!h-6 p-0.5">
+              <TabsTrigger value="day-hour" className="text-xs px-2 h-5">
+                Day × Hour
+              </TabsTrigger>
+              <TabsTrigger value="hourly" className="text-xs px-2 h-5">
+                Hourly Heatmap
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs px-2 h-5">
+                Timeline
+              </TabsTrigger>
+            </TabsList>
+            <ClockDisplay />
+          </div>
 
           <TabsContent value="day-hour" className="mt-3">
             <DayHourMatrix stats={stats} maxVal={maxVal} />
@@ -179,6 +182,10 @@ export function PostActivityHeatmap() {
 /* ── Day × Hour Matrix ──────────────────────────────────── */
 
 function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: number }) {
+  const now = new Date();
+  const nowDay = (now.getUTCDay() + 6) % 7; // Monday=0 ... Sunday=6 (UTC)
+  const nowHour = now.getUTCHours();
+
   return (
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
       <h3 className="text-sm font-semibold mb-3 italic text-foreground/80">
@@ -188,10 +195,15 @@ function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
         <thead>
           <tr>
             <th className="w-12 text-[10px] font-medium text-muted-foreground text-left">Day</th>
-            {HOURS.map((h) => (
+            {HOURS.map((h, hi) => (
               <th
                 key={h}
-                className="text-[10px] font-medium text-muted-foreground text-center w-[38px]"
+                className={cn(
+                  'text-[10px] font-medium text-center w-[38px]',
+                  hi === nowHour
+                    ? 'text-primary font-bold'
+                    : 'text-muted-foreground'
+                )}
               >
                 {h}
               </th>
@@ -204,16 +216,24 @@ function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
         <tbody>
           {DAY_LABELS.map((day, di) => (
             <tr key={day}>
-              <td className="text-[11px] font-semibold text-muted-foreground pr-1">{day}</td>
+              <td
+                className={cn(
+                  'text-[11px] font-semibold pr-1',
+                  di === nowDay ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                {day}
+              </td>
               {stats.matrix[di].map((val, hi) => (
                 <td
                   key={hi}
                   className={cn(
                     'text-center text-[11px] font-medium rounded-md py-1.5 transition-colors',
-                    cellColor(val, maxVal)
+                    cellColor(val, maxVal),
+                    di === nowDay && hi === nowHour && 'ring-2 ring-primary shadow-sm'
                   )}
                 >
-                  {val || ''}
+                  {val > 0 ? val : '\u00a0'}
                 </td>
               ))}
               <td className="text-center text-[11px] font-bold text-amber-500 tabular-nums">
@@ -227,7 +247,12 @@ function DayHourMatrix({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
             {stats.hour_totals.map((val, hi) => (
               <td
                 key={hi}
-                className="text-center text-[10px] font-semibold text-muted-foreground tabular-nums"
+                className={cn(
+                  'text-center text-[10px] font-semibold tabular-nums',
+                  hi === nowHour
+                    ? 'text-primary font-bold'
+                    : 'text-muted-foreground'
+                )}
               >
                 {val}
               </td>
@@ -252,6 +277,7 @@ const BUCKET_LABELS = Array.from({ length: 12 }, (_, i) => {
 
 function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: number }) {
   const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+  const nowHour = new Date().getUTCHours();
 
   return (
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
@@ -301,6 +327,8 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
               const ratio = maxVal > 0 ? val / maxVal : 0;
               const heightPct = Math.max(ratio * 100, 2);
 
+              const isNow = i === nowHour;
+
               if (val === 0) {
                 return (
                   <div
@@ -313,7 +341,8 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                     <div
                       className={cn(
                         'w-full rounded-t-sm transition-all bg-muted/30',
-                        hoveredHour === i ? 'ring-2 ring-primary/50' : ''
+                        hoveredHour === i ? 'ring-2 ring-primary/50' : '',
+                        isNow && 'ring-2 ring-primary shadow-sm'
                       )}
                       style={{ height: `${heightPct}%` }}
                     />
@@ -329,13 +358,19 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                       onMouseEnter={() => setHoveredHour(i)}
                       onMouseLeave={() => setHoveredHour(null)}
                     >
-                      <span className="text-[9px] font-medium text-foreground/70 tabular-nums mb-1">
+                      <span
+                        className={cn(
+                          'text-[9px] font-medium tabular-nums mb-1',
+                          isNow ? 'text-primary font-bold' : 'text-foreground/70'
+                        )}
+                      >
                         {val}
                       </span>
                       <div
                         className={cn(
                           'w-full rounded-t-sm transition-all',
                           hoveredHour === i ? 'ring-2 ring-primary/50' : '',
+                          isNow && 'ring-2 ring-primary shadow-sm',
                           ratio > 0.75
                             ? 'bg-amber-400'
                             : ratio > 0.5
@@ -367,7 +402,11 @@ function HourlyHeatmap({ stats, maxVal }: { stats: PostActivityStats; maxVal: nu
                 key={h}
                 className={cn(
                   'flex-1 text-center text-[10px] font-medium transition-colors',
-                  hoveredHour === i ? 'text-primary font-bold' : 'text-muted-foreground'
+                  i === nowHour
+                    ? 'text-primary font-bold'
+                    : hoveredHour === i
+                      ? 'text-primary font-bold'
+                      : 'text-muted-foreground'
                 )}
               >
                 {h}
@@ -426,6 +465,45 @@ function BucketDetail({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ── Clock Display (UTC + Local) ──────────────────────────── */
+
+function formatTime(date: Date, utc: boolean): string {
+  const h = utc ? date.getUTCHours() : date.getHours();
+  const m = utc ? date.getUTCMinutes() : date.getMinutes();
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function ClockDisplay() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const localTz = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop()?.replace(/_/g, ' ') ?? '';
+    } catch {
+      return '';
+    }
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground shrink-0">
+      <span>
+        <span className="font-semibold text-primary">UTC</span>{' '}
+        {formatTime(now, true)}
+      </span>
+      <span className="text-border">·</span>
+      <span>
+        <span className="font-semibold text-foreground/70">{localTz}</span>{' '}
+        {formatTime(now, false)}
+      </span>
     </div>
   );
 }
