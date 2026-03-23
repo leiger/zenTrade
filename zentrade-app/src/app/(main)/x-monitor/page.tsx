@@ -11,14 +11,16 @@ import { StrategyManager } from '@/components/modules/x-monitor/StrategyManager'
 import { HistoryDialog } from '@/components/modules/x-monitor/HistoryDialog';
 import { PostActivityHeatmap } from '@/components/modules/x-monitor/PostActivityHeatmap';
 import { StrategyNotes } from '@/components/modules/x-monitor/StrategyNotes';
+import { TradeHistory } from '@/components/modules/x-monitor/TradeHistory';
 import { useXMonitorStore } from '@/lib/xmonitor-store';
-import { mapStatus, importMuskTweets } from '@/lib/xmonitor-api';
+import { mapStatus, importMuskTweets, normalizeBrowserApiBase } from '@/lib/xmonitor-api';
 import type { MonitorAlert, StrategyInstance, StrategyType } from '@/types/xmonitor';
 import { STRATEGY_TYPE_LABELS } from '@/types/xmonitor';
 import { Separator } from '@/components/ui/separator';
 
-const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
-  .replace(/^http/, 'ws');
+const WS_BASE = normalizeBrowserApiBase(
+  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api',
+).replace(/^http/, 'ws');
 
 const FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -199,6 +201,7 @@ function XMonitorContent() {
             <TabsTrigger value="list">Strategy List</TabsTrigger>
             <TabsTrigger value="manager">Strategy Manager</TabsTrigger>
             <TabsTrigger value="notes">Note</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -252,6 +255,10 @@ function XMonitorContent() {
 
           <TabsContent value="notes" className="space-y-4">
             <StrategyNotes />
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <TradeHistory />
           </TabsContent>
         </Tabs>
       </div>

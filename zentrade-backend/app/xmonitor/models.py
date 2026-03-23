@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 StrategyType = Literal["silent_period", "tail_sweep", "settlement_no", "panic_fade"]
@@ -73,6 +73,88 @@ class Note(BaseModel):
     id: str
     title: str
     content: str
+    created_at: str
+    updated_at: str
+
+
+# ── Trade Tags (全局标签池) ───────────────────────────────
+
+class TradeTagCreate(BaseModel):
+    name: str
+    color: str = "#3b82f6"
+
+
+class TradeTagUpdate(BaseModel):
+    name: str | None = None
+    color: str | None = None
+
+
+class TradeTag(BaseModel):
+    id: str
+    name: str
+    color: str
+    created_at: str
+
+
+# ── Trade Records (交易记录) ──────────────────────────────
+
+class TradeRecordCreate(BaseModel):
+    tag_ids: list[str] = []
+    remaining_time: str = ""
+    amount: float = 0.0
+    price: float = Field(default=0.0, ge=0, le=100)
+    remain: int = Field(default=1, ge=1)
+
+    @field_validator("remain", mode="before")
+    @classmethod
+    def normalize_remain_create(cls, v: object) -> int:
+        if v is None or v == "":
+            return 1
+        n = int(float(str(v).strip()))
+        return max(1, n)
+
+    @field_validator("price", mode="before")
+    @classmethod
+    def normalize_price_create(cls, v: object) -> float:
+        if v is None or v == "":
+            return 0.0
+        n = float(v)
+        n = max(0.0, min(100.0, n))
+        return round(n, 2)
+
+
+class TradeRecordUpdate(BaseModel):
+    tag_ids: list[str] | None = None
+    remaining_time: str | None = None
+    amount: float | None = None
+    price: float | None = Field(default=None, ge=0, le=100)
+    remain: int | None = Field(default=None, ge=1)
+
+    @field_validator("remain", mode="before")
+    @classmethod
+    def normalize_remain_update(cls, v: object) -> int | None:
+        if v is None or v == "":
+            return None
+        n = int(float(str(v).strip()))
+        return max(1, n)
+
+    @field_validator("price", mode="before")
+    @classmethod
+    def normalize_price_update(cls, v: object) -> float | None:
+        if v is None or v == "":
+            return None
+        n = float(v)
+        n = max(0.0, min(100.0, n))
+        return round(n, 2)
+
+
+class TradeRecord(BaseModel):
+    id: str
+    remaining_time: str
+    amount: float
+    price: float
+    remain: int
+    tags: list[TradeTag] = []
     created_at: str
     updated_at: str
 

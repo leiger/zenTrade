@@ -82,6 +82,29 @@ CREATE TABLE IF NOT EXISTS xmonitor_historical_posts (
     metrics        TEXT,
     raw_data       TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS xmonitor_trade_tags (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL UNIQUE,
+    color      TEXT NOT NULL DEFAULT '#3b82f6',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS xmonitor_trade_records (
+    id              TEXT PRIMARY KEY,
+    remaining_time  TEXT NOT NULL DEFAULT '',
+    amount          REAL NOT NULL DEFAULT 0.0,
+    price           REAL NOT NULL DEFAULT 0.0,
+    remain          INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS xmonitor_trade_record_tags (
+    record_id TEXT NOT NULL REFERENCES xmonitor_trade_records(id) ON DELETE CASCADE,
+    tag_id    TEXT NOT NULL REFERENCES xmonitor_trade_tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (record_id, tag_id)
+);
 """
 
 SEED_STRATEGIES = """
@@ -98,12 +121,29 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _migrate_xmonitor_trade_records(db: aiosqlite.Connection) -> None:
+    """Existing DBs keep old CREATE TABLE sql in sqlite_master; add missing columns by live schema."""
+    rows = await fetchall(db, "PRAGMA table_info(xmonitor_trade_records)")
+    if not rows:
+        return
+    col_names = {str(r["name"]) for r in rows}
+    if "price" not in col_names:
+        await db.execute(
+            "ALTER TABLE xmonitor_trade_records ADD COLUMN price REAL NOT NULL DEFAULT 0.0",
+        )
+    if "remain" not in col_names:
+        await db.execute(
+            "ALTER TABLE xmonitor_trade_records ADD COLUMN remain INTEGER NOT NULL DEFAULT 1",
+        )
+
+
 async def init_xmonitor_db():
     db = await get_db()
     try:
         await db.executescript(XMONITOR_SCHEMA)
         seed = SEED_STRATEGIES.replace("{now}", _now_iso())
         await db.executescript(seed)
+        await _migrate_xmonitor_trade_records(db)
         await db.commit()
     finally:
         await db.close()
@@ -535,3 +575,177 @@ async def get_post_activity_matrix(
         "hour_totals": hour_totals,
         "minute_buckets": minute_buckets,
     }
+
+
+# ── Trade Tags CRUD ───────────────────────────────────────
+
+async def list_trade_tags(db: aiosqlite.Connection) -> list[dict]:
+    rows = await fetchall(db, "SELECT * FROM xmonitor_trade_tags ORDER BY created_at")
+    return [{"id": r["id"], "name": r["name"], "color": r["color"], "created_at": r["created_at"]} for r in rows]
+
+
+async def create_trade_tag(db: aiosqlite.Connection, name: str, color: str) -> dict:
+    tid = str(uuid.uuid4())
+    now = _now_iso()
+    await db.execute(
+        "INSERT INTO xmonitor_trade_tags (id, name, color, created_at) VALUES (?,?,?,?)",
+        (tid, name, color, now),
+    )
+    await db.commit()
+    return {"id": tid, "name": name, "color": color, "created_at": now}
+
+
+async def update_trade_tag(db: aiosqlite.Connection, tag_id: str, name: str | None, color: str | None) -> dict | None:
+    rows = await fetchall(db, "SELECT * FROM xmonitor_trade_tags WHERE id = ?", (tag_id,))
+    if not rows:
+        return None
+    sets, vals = [], []
+    if name is not None:
+        sets.append("name = ?")
+        vals.append(name)
+    if color is not None:
+        sets.append("color = ?")
+        vals.append(color)
+    if not sets:
+        r = rows[0]
+        return {"id": r["id"], "name": r["name"], "color": r["color"], "created_at": r["created_at"]}
+    vals.append(tag_id)
+    await db.execute(f"UPDATE xmonitor_trade_tags SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+    await db.commit()
+    updated = await fetchall(db, "SELECT * FROM xmonitor_trade_tags WHERE id = ?", (tag_id,))
+    r = updated[0]
+    return {"id": r["id"], "name": r["name"], "color": r["color"], "created_at": r["created_at"]}
+
+
+async def delete_trade_tag(db: aiosqlite.Connection, tag_id: str) -> bool:
+    rows = await fetchall(db, "SELECT id FROM xmonitor_trade_tags WHERE id = ?", (tag_id,))
+    if not rows:
+        return False
+    await db.execute("DELETE FROM xmonitor_trade_record_tags WHERE tag_id = ?", (tag_id,))
+    await db.execute("DELETE FROM xmonitor_trade_tags WHERE id = ?", (tag_id,))
+    await db.commit()
+    return True
+
+
+# ── Trade Records CRUD ────────────────────────────────────
+
+async def _get_tags_for_record(db: aiosqlite.Connection, record_id: str) -> list[dict]:
+    """获取某条记录关联的所有标签。"""
+    sql = """
+        SELECT t.id, t.name, t.color, t.created_at
+        FROM xmonitor_trade_tags t
+        INNER JOIN xmonitor_trade_record_tags rt ON t.id = rt.tag_id
+        WHERE rt.record_id = ?
+        ORDER BY t.created_at
+    """
+    rows = await fetchall(db, sql, (record_id,))
+    return [{"id": r["id"], "name": r["name"], "color": r["color"], "created_at": r["created_at"]} for r in rows]
+
+
+async def _set_record_tags(db: aiosqlite.Connection, record_id: str, tag_ids: list[str]) -> None:
+    """重新设置记录的标签关联。"""
+    await db.execute("DELETE FROM xmonitor_trade_record_tags WHERE record_id = ?", (record_id,))
+    for tid in tag_ids:
+        await db.execute(
+            "INSERT OR IGNORE INTO xmonitor_trade_record_tags (record_id, tag_id) VALUES (?,?)",
+            (record_id, tid),
+        )
+
+
+async def _row_to_trade_record(db: aiosqlite.Connection, r: aiosqlite.Row) -> dict:
+    tags = await _get_tags_for_record(db, r["id"])
+    return {
+        "id": r["id"],
+        "remaining_time": r["remaining_time"],
+        "amount": r["amount"],
+        "price": r["price"],
+        "remain": int(r["remain"] if r["remain"] is not None else 1),
+        "tags": tags,
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+async def list_trade_records(db: aiosqlite.Connection, tag_id: str | None = None) -> list[dict]:
+    if tag_id:
+        sql = """
+            SELECT r.*
+            FROM xmonitor_trade_records r
+            INNER JOIN xmonitor_trade_record_tags rt ON r.id = rt.record_id
+            WHERE rt.tag_id = ?
+            ORDER BY r.created_at DESC
+        """
+        rows = await fetchall(db, sql, (tag_id,))
+    else:
+        rows = await fetchall(db, "SELECT * FROM xmonitor_trade_records ORDER BY created_at DESC")
+    results = []
+    for r in rows:
+        results.append(await _row_to_trade_record(db, r))
+    return results
+
+
+async def create_trade_record(
+    db: aiosqlite.Connection,
+    tag_ids: list[str],
+    remaining_time: str,
+    amount: float,
+    price: float = 0.0,
+    remain: int = 1,
+) -> dict:
+    rid = str(uuid.uuid4())
+    now = _now_iso()
+    await db.execute(
+        "INSERT INTO xmonitor_trade_records (id, remaining_time, amount, price, remain, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+        (rid, remaining_time, amount, price, remain, now, now),
+    )
+    await _set_record_tags(db, rid, tag_ids)
+    await db.commit()
+    rows = await fetchall(db, "SELECT * FROM xmonitor_trade_records WHERE id = ?", (rid,))
+    return await _row_to_trade_record(db, rows[0])
+
+
+async def update_trade_record(
+    db: aiosqlite.Connection,
+    record_id: str,
+    tag_ids: list[str] | None,
+    remaining_time: str | None,
+    amount: float | None,
+    price: float | None = None,
+    remain: int | None = None,
+) -> dict | None:
+    rows = await fetchall(db, "SELECT * FROM xmonitor_trade_records WHERE id = ?", (record_id,))
+    if not rows:
+        return None
+    sets, vals = [], []
+    if remaining_time is not None:
+        sets.append("remaining_time = ?")
+        vals.append(remaining_time)
+    if amount is not None:
+        sets.append("amount = ?")
+        vals.append(amount)
+    if price is not None:
+        sets.append("price = ?")
+        vals.append(price)
+    if remain is not None:
+        sets.append("remain = ?")
+        vals.append(remain)
+    now = _now_iso()
+    sets.append("updated_at = ?")
+    vals.append(now)
+    vals.append(record_id)
+    await db.execute(f"UPDATE xmonitor_trade_records SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+    if tag_ids is not None:
+        await _set_record_tags(db, record_id, tag_ids)
+    await db.commit()
+    updated = await fetchall(db, "SELECT * FROM xmonitor_trade_records WHERE id = ?", (record_id,))
+    return await _row_to_trade_record(db, updated[0])
+
+
+async def delete_trade_record(db: aiosqlite.Connection, record_id: str) -> bool:
+    rows = await fetchall(db, "SELECT id FROM xmonitor_trade_records WHERE id = ?", (record_id,))
+    if not rows:
+        return False
+    await db.execute("DELETE FROM xmonitor_trade_record_tags WHERE record_id = ?", (record_id,))
+    await db.execute("DELETE FROM xmonitor_trade_records WHERE id = ?", (record_id,))
+    await db.commit()
+    return True

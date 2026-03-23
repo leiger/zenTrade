@@ -90,6 +90,26 @@ export interface StrategyNote {
   updatedAt: string;
 }
 
+export interface TradeTag {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
+export interface TradeRecord {
+  id: string;
+  remainingTime: string;
+  amount: number;
+  /** Yes price or similar, 0–100, two decimal places */
+  price: number;
+  /** Positive integer (> 0) */
+  remain: number;
+  tags: TradeTag[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const STRATEGY_TYPE_LABELS: Record<StrategyType, string> = {
   silent_period: 'Silent Period',
   tail_sweep: 'Tail Sweep',

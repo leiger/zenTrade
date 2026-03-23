@@ -6,15 +6,48 @@ import type {
   StrategyNote,
   StrategyType,
   TrackingPeriod,
+  TradeTag,
+  TradeRecord,
 } from '@/types/xmonitor';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const DEFAULT_API_BASE = 'http://127.0.0.1:8000/api';
+
+/**
+ * Dev fix: browser may resolve `localhost` to IPv6 (::1) while uvicorn binds 127.0.0.1 → fetch fails.
+ * Relative bases (e.g. /api) are unchanged for reverse-proxy / Docker browser setups.
+ */
+export function normalizeBrowserApiBase(raw: string): string {
+  const b = raw.trim().replace(/\/$/, '');
+  if (!b) return DEFAULT_API_BASE;
+  if (!/^https?:\/\//i.test(b)) return b;
+  try {
+    const u = new URL(b);
+    if (u.hostname === 'localhost' || u.hostname === '::1') {
+      u.hostname = '127.0.0.1';
+    }
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return b;
+  }
+}
+
+const BASE = normalizeBrowserApiBase(process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE);
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
+  const url = `${BASE}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...init,
+    });
+  } catch (e) {
+    const hint =
+      e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Cannot reach API (${hint}). Is FastAPI running? Tried: ${url}. Set NEXT_PUBLIC_API_URL if needed.`,
+    );
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`API ${res.status}: ${text}`);
@@ -274,4 +307,114 @@ export async function fetchPostHistory(
   if (endDate) params.set('end_date', endDate);
   const qs = params.toString();
   return req<HistoricalPost[]>(`/xmonitor/posts/history${qs ? `?${qs}` : ''}`);
+}
+
+// ── Trade Tags API ───────────────────────────────────────
+
+function mapTradeTag(t: Record<string, unknown>): TradeTag {
+  return {
+    id: t.id as string,
+    name: t.name as string,
+    color: (t.color as string) ?? '#3b82f6',
+    createdAt: t.created_at as string,
+  };
+}
+
+function mapTradeRecord(r: Record<string, unknown>): TradeRecord {
+  const rawTags = Array.isArray(r.tags) ? (r.tags as Record<string, unknown>[]) : [];
+  return {
+    id: r.id as string,
+    remainingTime: (r.remaining_time as string) ?? '',
+    amount: (r.amount as number) ?? 0,
+    price: (r.price as number) ?? 0,
+    remain: typeof r.remain === 'number' ? Math.max(1, Math.floor(r.remain)) : 1,
+    tags: rawTags.map(mapTradeTag),
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+export async function fetchTradeTags(): Promise<TradeTag[]> {
+  const raw = await req<Record<string, unknown>[]>('/xmonitor/trade-tags');
+  return raw.map(mapTradeTag);
+}
+
+export async function createTradeTag(name: string, color: string): Promise<TradeTag> {
+  const raw = await req<Record<string, unknown>>('/xmonitor/trade-tags', {
+    method: 'POST',
+    body: JSON.stringify({ name, color }),
+  });
+  return mapTradeTag(raw);
+}
+
+export async function updateTradeTag(
+  id: string,
+  updates: { name?: string; color?: string },
+): Promise<TradeTag> {
+  const raw = await req<Record<string, unknown>>(`/xmonitor/trade-tags/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return mapTradeTag(raw);
+}
+
+export async function deleteTradeTag(id: string): Promise<void> {
+  await req<void>(`/xmonitor/trade-tags/${id}`, { method: 'DELETE' });
+}
+
+// ── Trade Records API ────────────────────────────────────
+
+export async function fetchTradeRecords(tagId?: string): Promise<TradeRecord[]> {
+  const params = new URLSearchParams();
+  if (tagId) params.set('tag_id', tagId);
+  const qs = params.toString();
+  const raw = await req<Record<string, unknown>[]>(`/xmonitor/trade-records${qs ? `?${qs}` : ''}`);
+  return raw.map(mapTradeRecord);
+}
+
+export async function createTradeRecord(
+  tagIds: string[],
+  remainingTime: string,
+  amount: number,
+  price: number,
+  remain: number,
+): Promise<TradeRecord> {
+  const raw = await req<Record<string, unknown>>('/xmonitor/trade-records', {
+    method: 'POST',
+    body: JSON.stringify({
+      tag_ids: tagIds,
+      remaining_time: remainingTime,
+      amount,
+      price,
+      remain,
+    }),
+  });
+  return mapTradeRecord(raw);
+}
+
+export async function updateTradeRecord(
+  id: string,
+  updates: {
+    tagIds?: string[];
+    remainingTime?: string;
+    amount?: number;
+    price?: number;
+    remain?: number;
+  },
+): Promise<TradeRecord> {
+  const body: Record<string, unknown> = {};
+  if (updates.tagIds !== undefined) body.tag_ids = updates.tagIds;
+  if (updates.remainingTime !== undefined) body.remaining_time = updates.remainingTime;
+  if (updates.amount !== undefined) body.amount = updates.amount;
+  if (updates.price !== undefined) body.price = updates.price;
+  if (updates.remain !== undefined) body.remain = updates.remain;
+  const raw = await req<Record<string, unknown>>(`/xmonitor/trade-records/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  return mapTradeRecord(raw);
+}
+
+export async function deleteTradeRecord(id: string): Promise<void> {
+  await req<void>(`/xmonitor/trade-records/${id}`, { method: 'DELETE' });
 }

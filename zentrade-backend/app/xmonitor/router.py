@@ -19,6 +19,12 @@ from app.xmonitor.models import (
     StrategyInstance,
     StrategyInstanceCreate,
     StrategyInstanceUpdate,
+    TradeTag,
+    TradeTagCreate,
+    TradeTagUpdate,
+    TradeRecord,
+    TradeRecordCreate,
+    TradeRecordUpdate,
 )
 from app.xmonitor.poller import poller
 from app.xmonitor.push import get_vapid_public_key
@@ -170,6 +176,102 @@ async def delete_note(note_id: str):
         await db.close()
 
 
+# ── Trade Tags CRUD ───────────────────────────────────────
+
+@router.get("/trade-tags", response_model=list[TradeTag])
+async def list_trade_tags():
+    db = await get_db()
+    try:
+        return await xdb.list_trade_tags(db)
+    finally:
+        await db.close()
+
+
+@router.post("/trade-tags", response_model=TradeTag, status_code=201)
+async def create_trade_tag(body: TradeTagCreate):
+    db = await get_db()
+    try:
+        return await xdb.create_trade_tag(db, body.name, body.color)
+    finally:
+        await db.close()
+
+
+@router.put("/trade-tags/{tag_id}", response_model=TradeTag)
+async def update_trade_tag(tag_id: str, body: TradeTagUpdate):
+    db = await get_db()
+    try:
+        result = await xdb.update_trade_tag(db, tag_id, body.name, body.color)
+        if not result:
+            raise HTTPException(404, "Trade tag not found")
+        return result
+    finally:
+        await db.close()
+
+
+@router.delete("/trade-tags/{tag_id}", status_code=204)
+async def delete_trade_tag(tag_id: str):
+    db = await get_db()
+    try:
+        deleted = await xdb.delete_trade_tag(db, tag_id)
+        if not deleted:
+            raise HTTPException(404, "Trade tag not found")
+    finally:
+        await db.close()
+
+
+# ── Trade Records CRUD ────────────────────────────────────
+
+@router.get("/trade-records", response_model=list[TradeRecord])
+async def list_trade_records(tag_id: Optional[str] = Query(None)):
+    db = await get_db()
+    try:
+        return await xdb.list_trade_records(db, tag_id=tag_id)
+    finally:
+        await db.close()
+
+
+@router.post("/trade-records", response_model=TradeRecord, status_code=201)
+async def create_trade_record(body: TradeRecordCreate):
+    db = await get_db()
+    try:
+        return await xdb.create_trade_record(
+            db, body.tag_ids, body.remaining_time, body.amount, body.price, body.remain
+        )
+    finally:
+        await db.close()
+
+
+@router.put("/trade-records/{record_id}", response_model=TradeRecord)
+async def update_trade_record(record_id: str, body: TradeRecordUpdate):
+    db = await get_db()
+    try:
+        result = await xdb.update_trade_record(
+            db,
+            record_id,
+            body.tag_ids,
+            body.remaining_time,
+            body.amount,
+            body.price,
+            body.remain,
+        )
+        if not result:
+            raise HTTPException(404, "Trade record not found")
+        return result
+    finally:
+        await db.close()
+
+
+@router.delete("/trade-records/{record_id}", status_code=204)
+async def delete_trade_record(record_id: str):
+    db = await get_db()
+    try:
+        deleted = await xdb.delete_trade_record(db, record_id)
+        if not deleted:
+            raise HTTPException(404, "Trade record not found")
+    finally:
+        await db.close()
+
+
 # ── Alerts ────────────────────────────────────────────────
 
 @router.get("/alerts", response_model=list[MonitorAlert])
@@ -290,3 +392,4 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         poller.unregister_ws(websocket)
         logger.info("WebSocket client disconnected")
+
