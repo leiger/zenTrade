@@ -3,7 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BrainCircuit, BarChart3, Inbox, Wallet, Radio, ScanSearch } from 'lucide-react';
+import { BrainCircuit, BarChart3, Inbox, LogOut, Wallet, Radio, ScanSearch } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { ThemeSwitcher } from '@/components/themes/theme-switcher';
 import { useThesisStore } from '@/lib/store';
@@ -46,6 +47,7 @@ const navigation = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter();
   const pathname = usePathname();
   const theses = useThesisStore((state) => state.theses);
   const fetchTheses = useThesisStore((state) => state.fetchTheses);
@@ -60,6 +62,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }, [fetchTheses, theses.length]);
 
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -69,7 +77,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
           <div className="flex flex-col gap-0.5 leading-none">
             <span className="text-base font-semibold tracking-wide">ZenTrade</span>
-            <span className="text-[10px] text-muted-foreground">认知交易系统</span>
+            <span className="text-[10px] text-muted-foreground">Cognitive trading</span>
           </div>
         </div>
       </SidebarHeader>
@@ -111,11 +119,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center justify-between px-2 pt-2 border-t w-full">
-          <span className="text-[10px] text-muted-foreground font-medium">ZenTrade v1.0</span>
-          <div className="flex items-center gap-0.5">
-            <ThemeSwitcher />
-            <ModeToggle />
+        <div className="flex flex-col gap-2 px-2 pt-2 border-t w-full">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton type="button" onClick={handleLogout} tooltip="Log out">
+                <LogOut />
+                <span>Log out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[10px] text-muted-foreground font-medium">ZenTrade v1.0</span>
+            <div className="flex items-center gap-0.5">
+              <ThemeSwitcher />
+              <ModeToggle />
+            </div>
           </div>
         </div>
       </SidebarFooter>

@@ -10,6 +10,7 @@ import { AlertTimeline } from '@/components/modules/x-monitor/AlertTimeline';
 import { StrategyManager } from '@/components/modules/x-monitor/StrategyManager';
 import { HistoryDialog } from '@/components/modules/x-monitor/HistoryDialog';
 import { PostActivityHeatmap } from '@/components/modules/x-monitor/PostActivityHeatmap';
+import { StrategyNotes } from '@/components/modules/x-monitor/StrategyNotes';
 import { useXMonitorStore } from '@/lib/xmonitor-store';
 import { mapStatus, importMuskTweets } from '@/lib/xmonitor-api';
 import type { MonitorAlert, StrategyInstance, StrategyType } from '@/types/xmonitor';
@@ -197,6 +198,7 @@ function XMonitorContent() {
             <TabsTrigger value="general">Summary</TabsTrigger>
             <TabsTrigger value="list">Strategy List</TabsTrigger>
             <TabsTrigger value="manager">Strategy Manager</TabsTrigger>
+            <TabsTrigger value="notes">Note</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -246,6 +248,10 @@ function XMonitorContent() {
               onEdit={handleEditStrategy}
               onDelete={deleteStrategy}
             />
+          </TabsContent>
+
+          <TabsContent value="notes" className="space-y-4">
+            <StrategyNotes />
           </TabsContent>
         </Tabs>
       </div>

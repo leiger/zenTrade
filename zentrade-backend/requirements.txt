@@ -6,3 +6,5 @@ aiosqlite
 httpx
 pywebpush
 cryptography
+bcrypt
+PyJWT

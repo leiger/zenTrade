@@ -82,6 +82,14 @@ export interface WsMessage {
   data: Record<string, unknown>;
 }
 
+export interface StrategyNote {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const STRATEGY_TYPE_LABELS: Record<StrategyType, string> = {
   silent_period: 'Silent Period',
   tail_sweep: 'Tail Sweep',

@@ -128,6 +128,13 @@ CREATE TABLE IF NOT EXISTS valuation_snapshots (
     as_of            TEXT NOT NULL,
     created_at       TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS auth_users (
+    id             TEXT PRIMARY KEY,
+    username       TEXT UNIQUE NOT NULL,
+    password_hash  TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+);
 """
 
 SEED_TAGS = """
@@ -160,6 +167,12 @@ async def get_db() -> aiosqlite.Connection:
 async def _migrate(db: aiosqlite.Connection):
     """Run schema migrations for existing databases."""
     await db.executescript("""
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS accounts (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,

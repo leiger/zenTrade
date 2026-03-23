@@ -336,3 +336,23 @@ class AssetDetail(BaseModel):
     price_history: list[HistoryPoint]
     valuation_history: list[HistoryPoint]
     related_theses: list[Thesis] = []
+
+
+# ── Auth ─────────────────────────────────────────────
+
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthLoginResponse(BaseModel):
+    token: str
+
+
+class AuthRegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthRegisterResponse(BaseModel):
+    token: str

@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS xmonitor_push_subscriptions (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS xmonitor_notes (
+    id         TEXT PRIMARY KEY,
+    title      TEXT NOT NULL,
+    content    TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS xmonitor_api_health (
     id              TEXT PRIMARY KEY,
     api_name        TEXT NOT NULL,
@@ -395,6 +403,70 @@ async def get_historical_posts(
             "rawData": json.loads(r["raw_data"]) if r["raw_data"] else None,
         } for r in rows
     ]
+
+
+# ── Notes CRUD ────────────────────────────────────────────
+
+async def list_notes(db: aiosqlite.Connection) -> list[dict]:
+    rows = await fetchall(db, "SELECT * FROM xmonitor_notes ORDER BY updated_at DESC")
+    return [_row_to_note(r) for r in rows]
+
+
+async def get_note(db: aiosqlite.Connection, note_id: str) -> dict | None:
+    rows = await fetchall(db, "SELECT * FROM xmonitor_notes WHERE id = ?", (note_id,))
+    return _row_to_note(rows[0]) if rows else None
+
+
+async def create_note(db: aiosqlite.Connection, title: str, content: str) -> dict:
+    nid = str(uuid.uuid4())
+    now = _now_iso()
+    await db.execute(
+        "INSERT INTO xmonitor_notes (id, title, content, created_at, updated_at) VALUES (?,?,?,?,?)",
+        (nid, title, content, now, now),
+    )
+    await db.commit()
+    return {"id": nid, "title": title, "content": content, "created_at": now, "updated_at": now}
+
+
+async def update_note(db: aiosqlite.Connection, note_id: str, title: str | None, content: str | None) -> dict | None:
+    existing = await get_note(db, note_id)
+    if not existing:
+        return None
+    sets, vals = [], []
+    if title is not None:
+        sets.append("title = ?")
+        vals.append(title)
+    if content is not None:
+        sets.append("content = ?")
+        vals.append(content)
+    if not sets:
+        return existing
+    now = _now_iso()
+    sets.append("updated_at = ?")
+    vals.append(now)
+    vals.append(note_id)
+    await db.execute(f"UPDATE xmonitor_notes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+    await db.commit()
+    return await get_note(db, note_id)
+
+
+async def delete_note(db: aiosqlite.Connection, note_id: str) -> bool:
+    rows = await fetchall(db, "SELECT id FROM xmonitor_notes WHERE id = ?", (note_id,))
+    if not rows:
+        return False
+    await db.execute("DELETE FROM xmonitor_notes WHERE id = ?", (note_id,))
+    await db.commit()
+    return True
+
+
+def _row_to_note(r: aiosqlite.Row) -> dict:
+    return {
+        "id": r["id"],
+        "title": r["title"],
+        "content": r["content"],
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
 
 
 async def get_post_activity_matrix(

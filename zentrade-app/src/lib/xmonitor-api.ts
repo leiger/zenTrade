@@ -3,6 +3,7 @@ import type {
   MonitorAlert,
   MonitorStatus,
   StrategyInstance,
+  StrategyNote,
   StrategyType,
   TrackingPeriod,
 } from '@/types/xmonitor';
@@ -188,6 +189,46 @@ export async function fetchVapidKey(): Promise<string> {
 }
 export async function importMuskTweets(): Promise<{ status: string; imported: number }> {
   return req<{ status: string; imported: number }>('/xmonitor/import-tweets', { method: 'POST' });
+}
+
+// ── Notes API ────────────────────────────────────────────
+
+function mapNote(n: Record<string, unknown>): StrategyNote {
+  return {
+    id: n.id as string,
+    title: n.title as string,
+    content: (n.content as string) ?? '',
+    createdAt: n.created_at as string,
+    updatedAt: n.updated_at as string,
+  };
+}
+
+export async function fetchNotes(): Promise<StrategyNote[]> {
+  const raw = await req<Record<string, unknown>[]>('/xmonitor/notes');
+  return raw.map(mapNote);
+}
+
+export async function createNote(title: string, content: string): Promise<StrategyNote> {
+  const raw = await req<Record<string, unknown>>('/xmonitor/notes', {
+    method: 'POST',
+    body: JSON.stringify({ title, content }),
+  });
+  return mapNote(raw);
+}
+
+export async function updateNote(
+  id: string,
+  updates: { title?: string; content?: string },
+): Promise<StrategyNote> {
+  const raw = await req<Record<string, unknown>>(`/xmonitor/notes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return mapNote(raw);
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  await req<void>(`/xmonitor/notes/${id}`, { method: 'DELETE' });
 }
 
 export interface PostActivityStats {

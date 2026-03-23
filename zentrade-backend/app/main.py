@@ -7,7 +7,7 @@ from app import models
 
 from app.database import init_db
 from app.seed import seed_data
-from app.routers import theses, snapshots, follow_ups, accounts, assets, holdings, adjustments, market_data
+from app.routers import theses, snapshots, follow_ups, accounts, assets, holdings, adjustments, market_data, auth
 from app.xmonitor.database import init_xmonitor_db
 from app.xmonitor.router import router as xmonitor_router
 from app.xmonitor.poller import poller as xmonitor_poller
@@ -44,6 +44,7 @@ app.include_router(assets.router, prefix="/api")
 app.include_router(holdings.router, prefix="/api")
 app.include_router(adjustments.router, prefix="/api")
 app.include_router(market_data.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 app.include_router(xmonitor_router, prefix="/api")
 
 

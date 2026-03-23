@@ -1,7 +1,9 @@
 """Populate the database with sample data matching the frontend seed."""
 
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
+
 from app.database import get_db, fetchall
 from app.portfolio_utils import create_valuation_snapshot
 

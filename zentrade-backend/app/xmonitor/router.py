@@ -12,6 +12,9 @@ from app.xmonitor import database as xdb
 from app.xmonitor.models import (
     AlertFeedback,
     MonitorAlert,
+    Note,
+    NoteCreate,
+    NoteUpdate,
     PushSubscriptionCreate,
     StrategyInstance,
     StrategyInstanceCreate,
@@ -120,6 +123,49 @@ async def delete_strategy(strategy_id: str):
         if not deleted:
             raise HTTPException(404, "Strategy not found")
         poller.engine.reset_all_for_strategy(strategy_id)
+    finally:
+        await db.close()
+
+
+# ── Notes CRUD ────────────────────────────────────────────
+
+@router.get("/notes", response_model=list[Note])
+async def list_notes():
+    db = await get_db()
+    try:
+        return await xdb.list_notes(db)
+    finally:
+        await db.close()
+
+
+@router.post("/notes", response_model=Note, status_code=201)
+async def create_note(body: NoteCreate):
+    db = await get_db()
+    try:
+        return await xdb.create_note(db, body.title, body.content)
+    finally:
+        await db.close()
+
+
+@router.put("/notes/{note_id}", response_model=Note)
+async def update_note(note_id: str, body: NoteUpdate):
+    db = await get_db()
+    try:
+        result = await xdb.update_note(db, note_id, body.title, body.content)
+        if not result:
+            raise HTTPException(404, "Note not found")
+        return result
+    finally:
+        await db.close()
+
+
+@router.delete("/notes/{note_id}", status_code=204)
+async def delete_note(note_id: str):
+    db = await get_db()
+    try:
+        deleted = await xdb.delete_note(db, note_id)
+        if not deleted:
+            raise HTTPException(404, "Note not found")
     finally:
         await db.close()
 
