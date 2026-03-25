@@ -80,12 +80,26 @@ function shiftStatsForTz(stats: PostActivityStats, offset: number): PostActivity
     }
   }
 
+  const minuteMatrix: number[][][] = Array.from({ length: 7 }, () =>
+    Array.from({ length: 24 }, () => Array(12).fill(0))
+  );
+  for (let d = 0; d < 7; d++) {
+    for (let h = 0; h < 24; h++) {
+      const newH = ((h + offset) % 24 + 24) % 24;
+      const newD = ((d + Math.floor((h + offset) / 24)) % 7 + 7) % 7;
+      for (let b = 0; b < 12; b++) {
+        minuteMatrix[newD][newH][b] += stats.minute_matrix[d][h][b];
+      }
+    }
+  }
+
   return {
     total_posts: stats.total_posts,
     matrix,
     day_totals: matrix.map((row) => row.reduce((a, b) => a + b, 0)),
     hour_totals: hourTotals,
     minute_buckets: minuteBuckets,
+    minute_matrix: minuteMatrix,
   };
 }
 
@@ -99,7 +113,7 @@ function getNowInTz(offset: number): { day: number; hour: number } {
 }
 
 export function PostActivityHeatmap() {
-  const [preset, setPreset] = useState<Preset>('7d');
+  const [preset, setPreset] = useState<Preset>('1d');
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [isCustom, setIsCustom] = useState(false);
@@ -287,8 +301,11 @@ function DayHourMatrix({
 
   return (
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
-      <h3 className="text-sm font-semibold mb-3 italic text-foreground/80">
+      <h3 className="text-sm font-semibold mb-3 italic text-foreground/80 flex flex-wrap items-center gap-2">
         Day of Week × Hour Matrix
+        <span className="text-[10px] font-normal text-muted-foreground not-italic">
+          (Hover a cell for 5-min breakdown)
+        </span>
       </h3>
       <table className="w-full border-separate border-spacing-[3px]">
         <thead>
@@ -323,18 +340,43 @@ function DayHourMatrix({
               >
                 {day}
               </td>
-              {stats.matrix[di].map((val, hi) => (
-                <td
-                  key={hi}
-                  className={cn(
-                    'text-center text-[11px] font-medium rounded-md py-1.5 transition-colors',
-                    cellColor(val, maxVal),
-                    di === nowDay && hi === nowHour && 'ring-2 ring-primary shadow-sm'
-                  )}
-                >
-                  {val > 0 ? val : '\u00a0'}
-                </td>
-              ))}
+              {stats.matrix[di].map((val, hi) => {
+                const cellClass = cn(
+                  'text-center text-[11px] font-medium rounded-md py-1.5 transition-colors',
+                  cellColor(val, maxVal),
+                  di === nowDay && hi === nowHour && 'ring-2 ring-primary shadow-sm'
+                );
+                if (val === 0) {
+                  return (
+                    <td key={hi} className={cellClass}>
+                      {'\u00a0'}
+                    </td>
+                  );
+                }
+                return (
+                  <td key={hi} className="p-0 align-middle">
+                    <HoverCard openDelay={0} closeDelay={0}>
+                      <HoverCardTrigger asChild>
+                        <div className={cn(cellClass, 'cursor-pointer w-full min-h-[2rem] flex items-center justify-center')}>
+                          {val}
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent
+                        side="top"
+                        sideOffset={8}
+                        className="w-[200px] p-3 pointer-events-none"
+                      >
+                        <BucketDetail
+                          hour={hi}
+                          buckets={stats.minute_matrix[di][hi]}
+                          hourTotal={val}
+                          dayLabel={day}
+                        />
+                      </HoverCardContent>
+                    </HoverCard>
+                  </td>
+                );
+              })}
               <td className="text-center text-[11px] font-bold text-amber-500 tabular-nums">
                 {stats.day_totals[di].toLocaleString()}
               </td>
@@ -532,16 +574,22 @@ function BucketDetail({
   hour,
   buckets,
   hourTotal,
+  dayLabel,
 }: {
   hour: number;
   buckets: number[];
   hourTotal: number;
+  /** When set (e.g. from Day×Hour matrix), show day above the time range */
+  dayLabel?: string;
 }) {
   const maxBucket = Math.max(...buckets, 1);
 
   return (
     <div className="space-y-1.5">
       <div className="text-[11px] font-semibold text-foreground mb-2">
+        {dayLabel ? (
+          <span className="block text-[10px] font-medium text-muted-foreground mb-0.5">{dayLabel}</span>
+        ) : null}
         {HOURS[hour]}:00 – {HOURS[hour]}:59
         <span className="text-muted-foreground font-normal ml-1.5">({hourTotal} posts)</span>
       </div>

@@ -518,6 +518,7 @@ async def get_post_activity_matrix(
 
     Rows: 0=Mon … 6=Sun.  Columns: 0–23 hours.
     SQLite strftime('%w') yields 0=Sun, so we remap.
+    Also returns minute_matrix 7×24×12 (5-minute buckets per cell) and minute_buckets (24×12 sum over days).
     """
     where_parts: list[str] = []
     params: list[str] = []
@@ -553,20 +554,28 @@ async def get_post_activity_matrix(
     hour_totals = [sum(matrix[d][h] for d in range(7)) for h in range(24)]
     total_posts = sum(day_totals)
 
-    # 5-minute buckets per hour (24 × 12)
-    bucket_sql = f"""
+    # 5-minute buckets: 7×24×12 (day × hour × bucket) + aggregated 24×12 for hourly chart
+    matrix_bucket_sql = f"""
         SELECT
+            CAST(strftime('%w', created_at) AS INTEGER) AS dow,
             CAST(strftime('%H', created_at) AS INTEGER) AS hour,
             CAST(strftime('%M', created_at) AS INTEGER) / 5 AS bucket,
             COUNT(*) AS cnt
         FROM xmonitor_historical_posts
         {where_clause}
-        GROUP BY hour, bucket
+        GROUP BY dow, hour, bucket
     """
-    bucket_rows = await fetchall(db, bucket_sql, tuple(params))
+    matrix_bucket_rows = await fetchall(db, matrix_bucket_sql, tuple(params))
+    minute_matrix: list[list[list[int]]] = [[[0] * 12 for _ in range(24)] for _ in range(7)]
+    for r in matrix_bucket_rows:
+        mapped_dow = sqlite_to_monday[r["dow"]]
+        minute_matrix[mapped_dow][r["hour"]][r["bucket"]] = r["cnt"]
+
     minute_buckets: list[list[int]] = [[0] * 12 for _ in range(24)]
-    for r in bucket_rows:
-        minute_buckets[r["hour"]][r["bucket"]] = r["cnt"]
+    for d in range(7):
+        for h in range(24):
+            for b in range(12):
+                minute_buckets[h][b] += minute_matrix[d][h][b]
 
     return {
         "total_posts": total_posts,
@@ -574,6 +583,7 @@ async def get_post_activity_matrix(
         "day_totals": day_totals,
         "hour_totals": hour_totals,
         "minute_buckets": minute_buckets,
+        "minute_matrix": minute_matrix,
     }
 
 

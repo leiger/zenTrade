@@ -270,6 +270,8 @@ export interface PostActivityStats {
   day_totals: number[];
   hour_totals: number[];
   minute_buckets: number[][];
+  /** 7×24×12: day-of-week × hour × 5-minute bucket */
+  minute_matrix: number[][][];
 }
 
 export async function fetchPostStats(
