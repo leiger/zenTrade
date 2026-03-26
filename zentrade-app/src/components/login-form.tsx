@@ -2,14 +2,12 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 export function LoginForm({ className, ...props }: React.ComponentProps<'form'>) {
-  const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
 
@@ -35,8 +33,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
         setError(data.error ?? 'Sign in failed');
         return;
       }
-      router.replace('/');
-      router.refresh();
+      // Full page load so the new Set-Cookie is always sent on the next request (middleware session check).
+      window.location.assign('/');
     } catch {
       setError('Network error, please try again');
     } finally {

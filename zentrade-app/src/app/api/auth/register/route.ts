@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ZENTRADE_SESSION_COOKIE } from '@/lib/auth-session';
 import { getBackendOrigin } from '@/lib/backend-origin';
+import { sessionCookieSetOptions } from '@/lib/session-cookie';
 
 function sessionMaxAgeSec(): number {
   const days = Number.parseInt(process.env.AUTH_JWT_EXPIRES_DAYS ?? '7', 10);
@@ -60,13 +61,11 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(ZENTRADE_SESSION_COOKIE, data.token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: sessionMaxAgeSec(),
-  });
+  cookieStore.set(
+    ZENTRADE_SESSION_COOKIE,
+    data.token,
+    sessionCookieSetOptions(request, sessionMaxAgeSec()),
+  );
 
   return NextResponse.json({ ok: true });
 }

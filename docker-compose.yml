@@ -1,16 +1,15 @@
+# Secrets live in .env.production. Do not set AUTH_* via environment: ${VAR} — empty .env would override env_file.
+# Build-time args still use host `.env` or: docker compose --env-file .env.production build
 services:
   backend:
     build: ./zentrade-backend
     restart: unless-stopped
+    env_file:
+      - .env.production
     volumes:
       - db-data:/data
     environment:
       - DB_PATH=/data/zentrade.db
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:-}
-      - AUTH_JWT_EXPIRES_DAYS=${AUTH_JWT_EXPIRES_DAYS:-7}
-      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
-      - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -22,11 +21,10 @@ services:
       context: ./zentrade-app
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    env_file:
+      - .env.production
     environment:
-      # Server-side login proxy must call backend by service name (NEXT_PUBLIC may be relative /api)
-      - API_URL=${API_URL:-http://backend:8000}
-      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:-}
-      - AUTH_JWT_EXPIRES_DAYS=${AUTH_JWT_EXPIRES_DAYS:-7}
+      - API_URL=http://backend:8000
     restart: unless-stopped
     depends_on:
       backend:
