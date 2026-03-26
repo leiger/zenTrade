@@ -12,6 +12,10 @@ if [ ! -f .env.production ]; then
   exit 1
 fi
 
+# Default `docker compose` reads `.env` for ${VAR} substitution; keep it in sync with production.
+cp .env.production .env
+echo "Synced .env from .env.production"
+
 set -a
 source .env.production
 set +a
