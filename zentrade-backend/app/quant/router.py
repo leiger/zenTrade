@@ -15,6 +15,7 @@ from app.quant import clients
 from app.quant.database import (
     get_hourly_counts,
     get_price_snapshots,
+    list_alerts,
     list_snapshot_slugs,
 )
 from app.quant.poller import poller
@@ -73,6 +74,16 @@ async def quant_snapshot_slugs():
     db = await get_db()
     try:
         return await list_snapshot_slugs(db)
+    finally:
+        await db.close()
+
+
+@router.get("/alerts")
+async def quant_alerts(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)):
+    """后端预警历史（已推送记录）。"""
+    db = await get_db()
+    try:
+        return await list_alerts(db, limit=limit, offset=offset)
     finally:
         await db.close()
 

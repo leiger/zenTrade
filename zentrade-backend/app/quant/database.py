@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS quant_alert_log (
     key     TEXT PRIMARY KEY,
     sent_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS quant_alerts (
+    id         TEXT PRIMARY KEY,
+    key        TEXT NOT NULL,
+    level      TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    detail     TEXT NOT NULL,
+    event_slug TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -152,6 +162,42 @@ async def get_hourly_counts(db: aiosqlite.Connection, days: int = 90) -> list[di
         (since,),
     )
     return [{"date": r["date"], "hour": r["hour"], "count": r["count"]} for r in rows]
+
+
+# ── Alert History ─────────────────────────────────────────
+
+async def save_alert(
+    db: aiosqlite.Connection,
+    key: str,
+    level: str,
+    title: str,
+    detail: str,
+    event_slug: str,
+) -> dict:
+    import uuid
+
+    aid = str(uuid.uuid4())
+    now = _now_iso()
+    await db.execute(
+        "INSERT INTO quant_alerts (id, key, level, title, detail, event_slug, created_at) VALUES (?,?,?,?,?,?,?)",
+        (aid, key, level, title, detail, event_slug, now),
+    )
+    await db.commit()
+    return {"id": aid, "key": key, "level": level, "title": title,
+            "detail": detail, "eventSlug": event_slug, "createdAt": now}
+
+
+async def list_alerts(db: aiosqlite.Connection, limit: int = 50, offset: int = 0) -> list[dict]:
+    rows = await fetchall(
+        db,
+        "SELECT * FROM quant_alerts ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    return [
+        {"id": r["id"], "key": r["key"], "level": r["level"], "title": r["title"],
+         "detail": r["detail"], "eventSlug": r["event_slug"], "createdAt": r["created_at"]}
+        for r in rows
+    ]
 
 
 # ── Alert Dedup Log ───────────────────────────────────────

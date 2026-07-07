@@ -19,6 +19,7 @@ TAG_MAP = {
     "settlement_no": "xmonitor-settle",
     "panic_fade": "xmonitor-panic",
     "api_health": "xmonitor-api",
+    "quant": "quant-alert",
 }
 
 TTL = 1800  # 30 minutes
