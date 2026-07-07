@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
+import { PushToggle } from '@/components/shared/PushToggle';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useMuskQuantStore } from '@/lib/musk-quant-store';
@@ -99,6 +100,7 @@ export function QuantHeader() {
             </a>
           </Button>
         )}
+        <PushToggle />
       </div>
 
       {event && (

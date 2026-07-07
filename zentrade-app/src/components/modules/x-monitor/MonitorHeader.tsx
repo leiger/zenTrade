@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { PushToggle } from '@/components/shared/PushToggle';
 import { fetchPastTrackings } from '@/lib/xmonitor-api';
 import type { MonitorStatus, TrackingPeriod } from '@/types/xmonitor';
 
@@ -172,6 +173,7 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
               <Download className={`h-3.5 w-3.5 ${importing ? 'animate-bounce' : ''}`} />
               <span>{importing ? 'Importing...' : 'Import'}</span>
             </Button>
+            <PushToggle />
           </div>
 
         </div>

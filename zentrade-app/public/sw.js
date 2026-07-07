@@ -31,12 +31,14 @@ self.addEventListener('notificationclick', (event) => {
 
   const data = event.notification.data || {};
   const alertId = data.alert_id;
-  const url = alertId ? `/x-monitor?alert=${alertId}` : '/x-monitor';
+  // quant 预警跳 Musk Quant 页，其余跳 X Monitor
+  const base = (event.notification.tag || '').startsWith('quant') ? '/musk-quant' : '/x-monitor';
+  const url = alertId && base === '/x-monitor' ? `${base}?alert=${alertId}` : base;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url.includes('/x-monitor') && 'focus' in client) {
+        if (client.url.includes(base) && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }

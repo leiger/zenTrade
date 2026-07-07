@@ -18,5 +18,9 @@ jobs:
             set -e
             cd ~/zenTrade
             git pull origin main
+            if ! grep -q '^VAPID_PRIVATE_KEY=' .env.production; then
+              printf 'VAPID_PRIVATE_KEY=%s\nVAPID_PUBLIC_KEY=%s\nVAPID_EMAIL=%s\n' \
+                '${{ secrets.VAPID_PRIVATE_KEY }}' '${{ secrets.VAPID_PUBLIC_KEY }}' 'leiger2017@gmail.com' >> .env.production
+            fi
             docker compose --env-file .env.production up -d --build
             docker image prune -f

@@ -19,6 +19,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'ZenTrade — 认知交易系统',
   description: '通过数据透明化与决策逻辑化，利用 AI 辅助阻断情绪干扰的个人资产管理工具。',
+  // PWA：iOS 需「添加到主屏幕」后才支持 Web Push（iOS 16.4+）
+  appleWebApp: {
+    capable: true,
+    title: 'ZenTrade',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export default function RootLayout({

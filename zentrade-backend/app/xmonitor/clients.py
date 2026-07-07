@@ -91,13 +91,20 @@ async def polymarket_get_event(slug: str) -> dict[str, Any] | None:
 
 
 def parse_brackets(event: dict[str, Any]) -> list[dict[str, Any]]:
-    """Parse market brackets from a Polymarket event response."""
+    """Parse market brackets from a Polymarket event response.
+
+    区间名优先取 groupItemTitle（"<40" / "40-64" / "240+"，干净格式），
+    question 正则仅作回退——旧实现只解析 question，"<40" 会变成 unknown 且
+    lower_bound=0，导致 settlement_no/panic_fade 的 gap 计算把该区间排除。
+    """
+    from app.quant.clients import parse_bucket_label
+
     markets = event.get("markets", [])
     brackets: list[dict[str, Any]] = []
     for m in markets:
         question = m.get("question", "")
-        bracket_range = _extract_bracket_range(question)
-        lower, upper = _parse_range_bounds(bracket_range)
+        label = m.get("groupItemTitle") or _extract_bracket_range(question)
+        lower, upper = parse_bucket_label(label)
         prices = m.get("outcomePrices", "[]")
         if isinstance(prices, str):
             import json
@@ -108,16 +115,23 @@ def parse_brackets(event: dict[str, Any]) -> list[dict[str, Any]]:
         yes_price = float(prices[0]) * 100 if len(prices) > 0 else 0
         no_price = float(prices[1]) * 100 if len(prices) > 1 else 0
 
+        bid = m.get("bestBid")
+        ask = m.get("bestAsk")
+        yes_bid = round(float(bid) * 100, 2) if isinstance(bid, (int, float)) else None
+        yes_ask = round(float(ask) * 100, 2) if isinstance(ask, (int, float)) else None
+
         slug = event.get("slug", "")
         bracket_url = f"https://polymarket.com/event/{slug}" if slug else ""
 
         brackets.append({
             "question": question,
-            "bracket_range": bracket_range,
+            "bracket_range": label,
             "lower_bound": lower,
             "upper_bound": upper,
             "yes_price": round(yes_price, 2),
             "no_price": round(no_price, 2),
+            "yes_bid": yes_bid,
+            "yes_ask": yes_ask,
             "volume": m.get("volume", 0),
             "polymarket_url": bracket_url,
         })
@@ -127,24 +141,20 @@ def parse_brackets(event: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _extract_bracket_range(question: str) -> str:
-    """Extract range like '240-259' or '580+' from a market question."""
+    """Fallback: extract range like '240-259' or '580+' from a market question."""
     m = re.search(r"(\d+)-(\d+)", question)
     if m:
         return f"{m.group(1)}-{m.group(2)}"
     m = re.search(r"(\d+)\+", question)
     if m:
         return f"{m.group(1)}+"
+    m = re.search(r"less than (\d+)|fewer than (\d+)", question, re.IGNORECASE)
+    if m:
+        return f"<{m.group(1) or m.group(2)}"
+    m = re.search(r"(\d+) or more", question, re.IGNORECASE)
+    if m:
+        return f"{m.group(1)}+"
     return "unknown"
-
-
-def _parse_range_bounds(bracket_range: str) -> tuple[int, int | None]:
-    """Parse lower and upper bounds from a bracket range string."""
-    if bracket_range.endswith("+"):
-        return int(bracket_range[:-1]), None
-    parts = bracket_range.split("-")
-    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-        return int(parts[0]), int(parts[1])
-    return 0, None
 
 
 async def fetch_market_for_tracking(tracking: dict[str, Any]) -> dict[str, Any] | None:

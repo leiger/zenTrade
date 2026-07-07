@@ -112,7 +112,7 @@ INSERT OR IGNORE INTO xmonitor_strategy_instances (id, strategy_type, name, enab
 VALUES
     ('default-silent-6h',  'silent_period',  '沉默6h提醒',      1, '{"silence_hours":6,"remind_interval_minutes":60}',                       '{now}', '{now}'),
     ('default-tail-99',    'tail_sweep',     '扫尾99%',         1, '{"min_yes_price":99}',                                                    '{now}', '{now}'),
-    ('default-settle-12h', 'settlement_no',  '结算12h/100gap',  1, '{"remaining_hours":12,"min_gap":100,"max_no_price":99.5,"remind_interval_minutes":120}', '{now}', '{now}'),
+    ('default-settle-12h', 'settlement_no',  '结算NO 72h/60gap', 1, '{"remaining_hours":72,"min_gap":60,"max_no_price":99.5,"remind_interval_minutes":120}', '{now}', '{now}'),
     ('default-panic-2h',   'panic_fade',     '恐慌盘2h/50gap',  1, '{"remaining_hours":2,"min_gap":50,"min_yes_price":5}',                    '{now}', '{now}');
 """
 
@@ -137,6 +137,18 @@ async def _migrate_xmonitor_trade_records(db: aiosqlite.Connection) -> None:
         )
 
 
+async def _migrate_settlement_no_defaults(db: aiosqlite.Connection) -> None:
+    """出厂参数 12h/100gap 在有效市场里几乎不可能触发（结算前 12h 必输区间 NO
+    常年 ≥99.9¢）。放宽为 72h/60gap——只迁移仍保持出厂默认值的实例，用户改过不动。"""
+    old_params = '{"remaining_hours":12,"min_gap":100,"max_no_price":99.5,"remind_interval_minutes":120}'
+    new_params = '{"remaining_hours":72,"min_gap":60,"max_no_price":99.5,"remind_interval_minutes":120}'
+    await db.execute(
+        "UPDATE xmonitor_strategy_instances SET params = ?, name = ?, updated_at = ? "
+        "WHERE id = 'default-settle-12h' AND params = ?",
+        (new_params, "结算NO 72h/60gap", _now_iso(), old_params),
+    )
+
+
 async def init_xmonitor_db():
     db = await get_db()
     try:
@@ -144,6 +156,7 @@ async def init_xmonitor_db():
         seed = SEED_STRATEGIES.replace("{now}", _now_iso())
         await db.executescript(seed)
         await _migrate_xmonitor_trade_records(db)
+        await _migrate_settlement_no_defaults(db)
         await db.commit()
     finally:
         await db.close()

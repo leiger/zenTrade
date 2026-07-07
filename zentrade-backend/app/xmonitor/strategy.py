@@ -167,8 +167,8 @@ class StrategyEngine:
 
             if post_count < lower:
                 continue
-            if upper is not None and post_count < lower:
-                continue
+            if upper is not None and post_count > upper:
+                continue  # 已冲破上限的区间必输，YES 价无意义
             if yes_price < min_yes:
                 continue
 
@@ -212,7 +212,9 @@ class StrategyEngine:
         for b in brackets:
             lower = b.get("lower_bound", 0)
             gap = lower - post_count
-            no_price = b.get("no_price", 0)
+            # NO 可成交买价 = 100 − YES bid（比 outcomePrices 的最近成交价更真实）
+            yes_bid = b.get("yes_bid")
+            no_price = round(100 - yes_bid, 2) if yes_bid is not None else b.get("no_price", 0)
 
             if gap < min_gap:
                 continue
@@ -260,7 +262,9 @@ class StrategyEngine:
         for b in brackets:
             lower = b.get("lower_bound", 0)
             gap = lower - post_count
-            yes_price = b.get("yes_price", 0)
+            # 用 YES bid（真实挂单）判断恐慌买盘，避免 last-trade 陈旧价误报
+            yes_bid = b.get("yes_bid")
+            yes_price = yes_bid if yes_bid is not None else b.get("yes_price", 0)
 
             if gap < min_gap:
                 continue
