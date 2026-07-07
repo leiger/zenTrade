@@ -101,8 +101,12 @@ export function ProbabilityAnalysis() {
               </TableBody>
             </Table>
             <p className="mt-2 text-[10px] text-muted-foreground">
-              VR = 模型概率 ÷ 买入价（ask，可成交口径），≥1.2 有价值 · 概率为泊松模型（λ = 会话修正 µ{' '}
-              {prediction.lambdaMu.toFixed(0)}）在 ≥1¢ 区间内归一化 · 「薄」= 点差 ≥5¢，成交成本高
+              VR = 模型概率 ÷ 买入价（ask，可成交口径），≥1.2 有价值 ·{' '}
+              {analysis.distribution === 'bootstrap'
+                ? `概率为经验 bootstrap 分布（近 ${analysis.constants.daysUsed || 90} 天剩余时段重采样，`
+                : '概率为泊松模型（'}
+              λ = 会话修正 µ {prediction.lambdaMu.toFixed(0)}）在 ≥1¢ 区间内归一化 · 「薄」= 点差
+              ≥5¢，成交成本高
             </p>
           </CardContent>
         </Card>

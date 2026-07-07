@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import type { ElonPost, QuantEvent, QuantPosition } from '@/types/musk-quant';
-import { fetchElonPosts, fetchQuantConstants, fetchQuantEvents } from '@/lib/musk-quant-api';
+import {
+  fetchElonPosts,
+  fetchQuantConstants,
+  fetchQuantEvents,
+  fetchRemainingSamples,
+} from '@/lib/musk-quant-api';
 import { DEFAULT_CONSTANTS, type QuantConstants } from '@/lib/musk-quant-engine';
+
+/** 选中市场的剩余小时（bootstrap 样本请求用） */
+function remainingHoursOf(events: QuantEvent[], slug: string | null): number | null {
+  const event = events.find((e) => e.slug === slug) ?? events[0];
+  if (!event) return null;
+  return Math.max(0, (new Date(event.endDate).getTime() - Date.now()) / 3600_000);
+}
 
 const POSITIONS_KEY = 'zentrade.musk-quant.positions';
 /** 推文历史回溯天数：会话节奏与小时基线需要 ~30 天样本 */
@@ -33,6 +45,8 @@ interface MuskQuantStore {
   positions: QuantPosition[];
   /** 模型常量（后端滚动重估，失败回退冻结默认表） */
   constants: QuantConstants;
+  /** 剩余时段 bootstrap 样本（null → 泊松回退） */
+  remainingSamples: number[] | null;
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -52,6 +66,7 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
   posts: [],
   positions: [],
   constants: DEFAULT_CONSTANTS,
+  remainingSamples: null,
   loading: false,
   refreshing: false,
   error: null,
@@ -75,6 +90,10 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
         loading: false,
         lastUpdatedAt: new Date().toISOString(),
       }));
+      const rh = remainingHoursOf(events, get().selectedSlug);
+      if (rh !== null) {
+        set({ remainingSamples: await fetchRemainingSamples(rh) });
+      }
     } catch (e) {
       set({ loading: false, error: e instanceof Error ? e.message : 'load failed' });
     }
@@ -93,12 +112,23 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
         refreshing: false,
         lastUpdatedAt: new Date().toISOString(),
       }));
+      const rh = remainingHoursOf(events, get().selectedSlug);
+      if (rh !== null) {
+        set({ remainingSamples: await fetchRemainingSamples(rh) });
+      }
     } catch (e) {
       set({ refreshing: false, error: e instanceof Error ? e.message : 'refresh failed' });
     }
   },
 
-  selectEvent: (slug) => set({ selectedSlug: slug }),
+  selectEvent: (slug) => {
+    set({ selectedSlug: slug });
+    // 切市场后剩余时长变化，异步更新 bootstrap 样本（失败仅回退泊松，不报错）
+    const rh = remainingHoursOf(get().events, slug);
+    if (rh !== null) {
+      void fetchRemainingSamples(rh).then((samples) => set({ remainingSamples: samples }));
+    }
+  },
 
   addPosition: (p) => {
     const position: QuantPosition = {

@@ -37,9 +37,10 @@ class QuantPoller:
         self.cached_at: float = 0.0
         self.last_snapshot_at: datetime | None = None
 
-        # 滚动常量缓存（每小时重估一次）
+        # 滚动常量缓存（每小时重估一次）；日向量供 bootstrap 抽样复用
         self._constants: engine.Constants | None = None
         self._constants_at: float = 0.0
+        self._day_vectors: list[list[int]] = []
 
     def start(self):
         if self._running:
@@ -105,12 +106,24 @@ class QuantPoller:
             await db.close()
         today_bj = engine.bj_date_key(datetime.now(timezone.utc))
         self._constants = engine.constants_from_daily_rows(rows, today_bj)
+        self._day_vectors = engine.day_vectors_from_rows(rows, today_bj)
         self._constants_at = time.time()
         logger.info(
             "Quant constants: source=%s days_used=%d baseline=%.1f",
             self._constants.source, self._constants.days_used, self._constants.daily_baseline,
         )
         return self._constants
+
+    def remaining_samples(self, remaining_hours: float, now: datetime, n: int = 1000) -> list[int]:
+        """剩余时段的 bootstrap 样本；数据不足（<21 完整天）返回空列表（调用方回退泊松）。"""
+        if len(self._day_vectors) < engine.MIN_CALIBRATION_DAYS:
+            return []
+        bj = engine.bj_now(now)
+        hours_to_midnight = 24 - bj.hour - bj.minute / 60
+        n_full_days = max(0, round((remaining_hours - hours_to_midnight) / 24))
+        return engine.bootstrap_remaining_samples(
+            self._day_vectors, bj.hour, n_full_days, n_samples=n,
+        )
 
     # ── 预警评估 ──────────────────────────────────────────
 
@@ -167,6 +180,7 @@ class QuantPoller:
 
         buckets = clients.parse_event_buckets(event)
         consts = await self.get_constants()
+        samples = self.remaining_samples(remaining_hours, now)
         candidates = engine.build_alerts(
             buckets=buckets,
             current=current,
@@ -177,6 +191,7 @@ class QuantPoller:
             now=now,
             today_by_hour=today_by_hour,
             consts=consts,
+            samples=samples,
         )
         if not candidates:
             return

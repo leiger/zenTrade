@@ -111,6 +111,23 @@ async def quant_constants():
     }
 
 
+@router.get("/remaining-samples")
+async def quant_remaining_samples(remainingHours: float = Query(..., ge=0, le=200)):
+    """剩余时段发推数的 bootstrap 样本（形状用，前端均值对齐 λ 后算区间概率）。
+
+    数据不足 21 完整天时 source=insufficient，前端回退泊松。
+    """
+    from datetime import datetime, timezone
+
+    await poller.get_constants()  # 确保日向量已加载
+    samples = poller.remaining_samples(remainingHours, datetime.now(timezone.utc), n=500)
+    return {
+        "source": "live" if samples else "insufficient",
+        "daysUsed": len(poller._day_vectors),
+        "samples": samples,
+    }
+
+
 @router.get("/hourly-counts")
 async def quant_hourly_counts(days: int = Query(90, ge=1, le=365)):
     """近 N 天每 (UTC 日期, 小时) 推文计数，滚动常量重估的数据源。"""

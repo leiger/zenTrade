@@ -164,6 +164,27 @@ export async function fetchQuantConstants(): Promise<QuantConstants> {
   }
 }
 
+/**
+ * 拉取剩余时段发推数的 bootstrap 样本（经验分布形状）。
+ * 后端数据不足或不可达时返回 null，evaluateBuckets 回退泊松。
+ */
+export async function fetchRemainingSamples(remainingHours: number): Promise<number[] | null> {
+  try {
+    const res = await fetch(
+      `${BACKEND_BASE}/quant/remaining-samples?remainingHours=${remainingHours.toFixed(1)}`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as { source: string; samples: number[] };
+    if (body.source !== 'live' || !Array.isArray(body.samples) || body.samples.length < 100) {
+      return null;
+    }
+    return body.samples;
+  } catch {
+    return null;
+  }
+}
+
 interface XtrackerPostRaw {
   id: string;
   platformId: string;

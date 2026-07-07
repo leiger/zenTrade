@@ -408,10 +408,13 @@ export function bidPctOf(b: QuantBucket): number {
 }
 
 /**
- * 区间估值：泊松概率（仅中间价 ≥1¢ 参与归一化）+ VR + 状态/时速。
+ * 区间估值：区间概率（仅中间价 ≥1¢ 参与归一化）+ VR + 状态/时速。
  * λ 用会话修正后的 µ（lambdaMu），与展示落点同源。
  * VR 用买入可成交价（ask）：低价区间点差大，中间价 VR 会高估实际拿到的赔率。
+ * 有 bootstrap 样本（后端近 90 天剩余时段经验分布）时用它——形状取自历史、
+ * 均值对齐 λ，保留推文的过度离散；否则回退泊松。
  * @param buckets price 为 0-1 小数
+ * @param remainingSamples 后端 /api/quant/remaining-samples 的剩余条数样本
  */
 export function evaluateBuckets(
   buckets: QuantBucket[],
@@ -419,6 +422,7 @@ export function evaluateBuckets(
   current: number,
   pace: number,
   remainingHours: number,
+  remainingSamples: number[] | null = null,
 ): BucketProb[] {
   const M = prediction.lambdaMu;
   const sigma = prediction.sigma;
@@ -431,12 +435,24 @@ export function evaluateBuckets(
     return { bucket: b, pricePct, min: b.min, max };
   });
 
-  // 泊松归一化：仅价格 ≥1¢ 的区间参与
+  // 归一化：仅价格 ≥1¢ 的区间参与
   const eligible = enriched.filter((e) => e.pricePct >= 1);
+
+  // bootstrap 经验分布：final = current + 样本 × (λ−current)/样本均值
+  let finals: number[] | null = null;
+  if (remainingSamples && remainingSamples.length >= 100) {
+    const targetMean = Math.max(0.1, M - current);
+    const sampleMean = remainingSamples.reduce((a, b) => a + b, 0) / remainingSamples.length;
+    const scale = sampleMean > 0 ? targetMean / sampleMean : 1;
+    finals = remainingSamples.map((s) => current + s * scale);
+  }
+
   const raw = new Map<string, number>();
   let totalRaw = 0;
   for (const e of eligible) {
-    const p = poissonRange(e.min, e.max, M);
+    const p = finals
+      ? finals.filter((f) => f >= e.min - 0.5 && f <= e.max + 0.5).length / finals.length
+      : poissonRange(e.min, e.max, M);
     raw.set(e.bucket.marketId, p);
     totalRaw += p;
   }
