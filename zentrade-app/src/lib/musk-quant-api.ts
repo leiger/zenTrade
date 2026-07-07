@@ -1,4 +1,11 @@
 import type { ElonPost, QuantBucket, QuantEvent } from '@/types/musk-quant';
+import {
+  DEFAULT_CONSTANTS,
+  SESSIONS,
+  type QuantConstants,
+  type SessionDef,
+} from '@/lib/musk-quant-engine';
+import { normalizeBrowserApiBase } from '@/lib/xmonitor-api';
 
 /**
  * Musk Quant 数据获取层。
@@ -91,6 +98,70 @@ export async function fetchQuantEvents(): Promise<QuantEvent[]> {
       .map(mapBucket)
       .sort((a, b) => a.min - b.min),
   }));
+}
+
+/** FastAPI 后端基址（constants 等仅由后端提供的端点用它；/api/quant/* 代理在 dev 下走 Next handler） */
+const BACKEND_BASE = normalizeBrowserApiBase(
+  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api',
+);
+
+interface ConstantsResponseRaw {
+  source: 'default' | 'live';
+  daysUsed: number;
+  dailyBaseline: number;
+  hourlyFraction: number[];
+  sessions: {
+    name: string;
+    bjHours: number[];
+    freq: number;
+    avgTweets: number;
+    medTweets: number;
+    strongThreshold: number;
+    weakThreshold: number;
+    expectedContrib: number;
+  }[];
+}
+
+/**
+ * 拉取滚动重估的模型常量（近 90 天）。
+ * 后端不可达或样本不足时回退 206 天冻结默认表——调用方无需感知失败。
+ */
+export async function fetchQuantConstants(): Promise<QuantConstants> {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/quant/constants`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return DEFAULT_CONSTANTS;
+    const raw = (await res.json()) as ConstantsResponseRaw;
+    if (raw.source !== 'live' || raw.hourlyFraction?.length !== 24) return DEFAULT_CONSTANTS;
+
+    // emoji / cdt 等展示属性保留自默认表（按会话名对齐）
+    const sessions: SessionDef[] = raw.sessions.map((s) => {
+      const base = SESSIONS.find((d) => d.name === s.name);
+      return {
+        name: s.name,
+        emoji: base?.emoji ?? '🕐',
+        cdt: base?.cdt ?? '',
+        bjHours: s.bjHours,
+        freq: s.freq,
+        avgTweets: s.avgTweets,
+        medTweets: s.medTweets,
+        strongThreshold: s.strongThreshold,
+        weakThreshold: s.weakThreshold,
+        expectedContrib: s.expectedContrib,
+      };
+    });
+
+    return {
+      source: 'live',
+      daysUsed: raw.daysUsed,
+      dailyBaseline: raw.dailyBaseline,
+      hourlyFraction: raw.hourlyFraction,
+      sessions,
+    };
+  } catch {
+    return DEFAULT_CONSTANTS;
+  }
 }
 
 interface XtrackerPostRaw {

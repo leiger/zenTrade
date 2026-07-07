@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ElonPost, QuantEvent, QuantPosition } from '@/types/musk-quant';
-import { fetchElonPosts, fetchQuantEvents } from '@/lib/musk-quant-api';
+import { fetchElonPosts, fetchQuantConstants, fetchQuantEvents } from '@/lib/musk-quant-api';
+import { DEFAULT_CONSTANTS, type QuantConstants } from '@/lib/musk-quant-engine';
 
 const POSITIONS_KEY = 'zentrade.musk-quant.positions';
 /** 推文历史回溯天数：会话节奏与小时基线需要 ~30 天样本 */
@@ -30,6 +31,8 @@ interface MuskQuantStore {
   selectedSlug: string | null;
   posts: ElonPost[];
   positions: QuantPosition[];
+  /** 模型常量（后端滚动重估，失败回退冻结默认表） */
+  constants: QuantConstants;
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -48,6 +51,7 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
   selectedSlug: null,
   posts: [],
   positions: [],
+  constants: DEFAULT_CONSTANTS,
   loading: false,
   refreshing: false,
   error: null,
@@ -58,10 +62,15 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
     set({ loading: true, error: null, positions: loadPositions() });
     try {
       const since = new Date(Date.now() - HISTORY_DAYS * 86400_000).toISOString();
-      const [events, posts] = await Promise.all([fetchQuantEvents(), fetchElonPosts(since)]);
+      const [events, posts, constants] = await Promise.all([
+        fetchQuantEvents(),
+        fetchElonPosts(since),
+        fetchQuantConstants(),
+      ]);
       set((s) => ({
         events,
         posts,
+        constants,
         selectedSlug: s.selectedSlug ?? events[0]?.slug ?? null,
         loading: false,
         lastUpdatedAt: new Date().toISOString(),

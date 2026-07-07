@@ -164,6 +164,25 @@ async def get_hourly_counts(db: aiosqlite.Connection, days: int = 90) -> list[di
     return [{"date": r["date"], "hour": r["hour"], "count": r["count"]} for r in rows]
 
 
+# ── 滚动常量标定数据（BJ 日 × 小时计数）──────────────────
+
+async def get_bj_daily_hourly(db: aiosqlite.Connection, days: int = 120) -> list[dict]:
+    """近 N 天每 (北京时间日期, 小时) 的推文计数，滚动常量标定用。"""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows = await fetchall(
+        db,
+        """SELECT strftime('%Y-%m-%d', datetime(created_at, '+8 hours')) AS bj_date,
+                  CAST(strftime('%H', datetime(created_at, '+8 hours')) AS INTEGER) AS bj_hour,
+                  COUNT(*) AS cnt
+        FROM xmonitor_historical_posts
+        WHERE created_at >= ?
+        GROUP BY bj_date, bj_hour
+        ORDER BY bj_date, bj_hour""",
+        (since,),
+    )
+    return [{"date": r["bj_date"], "hour": r["bj_hour"], "count": r["cnt"]} for r in rows]
+
+
 # ── Alert History ─────────────────────────────────────────
 
 async def save_alert(

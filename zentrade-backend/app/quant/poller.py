@@ -11,6 +11,7 @@ from typing import Any
 from app.database import get_db
 from app.quant import clients, engine
 from app.quant.database import (
+    get_bj_daily_hourly,
     mark_alert_sent,
     prune_alert_log,
     save_alert,
@@ -35,6 +36,10 @@ class QuantPoller:
         self.cached_events: list[dict[str, Any]] = []
         self.cached_at: float = 0.0
         self.last_snapshot_at: datetime | None = None
+
+        # 滚动常量缓存（每小时重估一次）
+        self._constants: engine.Constants | None = None
+        self._constants_at: float = 0.0
 
     def start(self):
         if self._running:
@@ -88,6 +93,24 @@ class QuantPoller:
             logger.info("Quant snapshot saved: %d events, %d bucket rows", len(events), total)
         finally:
             await db.close()
+
+    async def get_constants(self, max_age_seconds: float = 3600.0) -> engine.Constants:
+        """滚动重估常量（近 90 天 BJ 日数据），样本不足时回退冻结默认值。"""
+        if self._constants and time.time() - self._constants_at < max_age_seconds:
+            return self._constants
+        db = await get_db()
+        try:
+            rows = await get_bj_daily_hourly(db, days=90)
+        finally:
+            await db.close()
+        today_bj = engine.bj_date_key(datetime.now(timezone.utc))
+        self._constants = engine.constants_from_daily_rows(rows, today_bj)
+        self._constants_at = time.time()
+        logger.info(
+            "Quant constants: source=%s days_used=%d baseline=%.1f",
+            self._constants.source, self._constants.days_used, self._constants.daily_baseline,
+        )
+        return self._constants
 
     # ── 预警评估 ──────────────────────────────────────────
 
@@ -143,6 +166,7 @@ class QuantPoller:
         today_count = sum(today_by_hour)
 
         buckets = clients.parse_event_buckets(event)
+        consts = await self.get_constants()
         candidates = engine.build_alerts(
             buckets=buckets,
             current=current,
@@ -152,6 +176,7 @@ class QuantPoller:
             event_slug=slug,
             now=now,
             today_by_hour=today_by_hour,
+            consts=consts,
         )
         if not candidates:
             return

@@ -5,11 +5,11 @@ import { BarChart2, Flame } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMuskQuantStore } from '@/lib/musk-quant-store';
 import {
-  HOURLY_BASELINE,
   buildHourlyMatrix,
   bjDateKey,
   bjHour,
   todayHourlyCounts,
+  type QuantConstants,
 } from '@/lib/musk-quant-engine';
 import { cn } from '@/lib/utils';
 
@@ -24,9 +24,20 @@ function cellClass(count: number): string {
   return 'bg-primary/90';
 }
 
-/** 今日实际 vs 206 天历史基线的 24 小时双层柱状图 */
-function TodayVsBaseline({ today, nowHour }: { today: number[]; nowHour: number }) {
-  const denom = Math.max(3.41, ...today, 1);
+/** 今日实际 vs 历史基线的 24 小时双层柱状图 */
+function TodayVsBaseline({
+  today,
+  nowHour,
+  constants,
+}: {
+  today: number[];
+  nowHour: number;
+  constants: QuantConstants;
+}) {
+  const baseline = constants.hourlyFraction.map((f) => f * constants.dailyBaseline);
+  const denom = Math.max(...baseline, ...today, 1);
+  const baselineLabel =
+    constants.source === 'live' ? `近 ${constants.daysUsed} 天滚动均值` : '206 天冻结均值';
 
   return (
     <Card>
@@ -36,12 +47,12 @@ function TodayVsBaseline({ today, nowHour }: { today: number[]; nowHour: number 
           今日节奏 vs 历史基线
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          前景 = 今日实际 · 背景 = 206 天历史小时均值 · 高峰 BJ 13–15 点
+          前景 = 今日实际 · 背景 = 历史小时均值（{baselineLabel}）· 高峰 BJ 13–15 点
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <div className="flex min-w-[640px] items-end gap-1" style={{ height: 120 }}>
-          {HOURLY_BASELINE.map((base, h) => {
+          {baseline.map((base, h) => {
             const actual = h <= nowHour ? today[h] : 0;
             const isPast = h <= nowHour;
             // 今日柱颜色：超预期 1.5x 琥珀 / 低于 0.4x 红 / 正常主色
@@ -92,6 +103,7 @@ function TodayVsBaseline({ today, nowHour }: { today: number[]; nowHour: number 
 
 export function RhythmHeatmap() {
   const posts = useMuskQuantStore((s) => s.posts);
+  const constants = useMuskQuantStore((s) => s.constants);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -129,7 +141,7 @@ export function RhythmHeatmap() {
 
   return (
     <div className="space-y-4">
-    <TodayVsBaseline today={today} nowHour={nowHour} />
+    <TodayVsBaseline today={today} nowHour={nowHour} constants={constants} />
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">

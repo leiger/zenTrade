@@ -27,7 +27,7 @@ import type { QuantEvent } from '@/types/musk-quant';
  * 每 60s 触发一次重算（时间推进会改变剩余时间/会话状态）。
  */
 export function useMuskQuantAnalysis() {
-  const { events, selectedSlug, posts } = useMuskQuantStore();
+  const { events, selectedSlug, posts, constants } = useMuskQuantStore();
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function useMuskQuantAnalysis() {
     );
     const pace = total / elapsedDays;
 
-    const prediction = computePrediction(total, todayCount, pace, remainingHours, todayByHour, now);
+    const prediction = computePrediction(total, todayCount, pace, remainingHours, todayByHour, now, constants);
     const probs = evaluateBuckets(event.buckets, prediction, total, pace, remainingHours);
 
     const startKey = event.startDate.slice(0, 10);
@@ -63,6 +63,7 @@ export function useMuskQuantAnalysis() {
     return {
       event,
       now,
+      constants,
       total,
       todayCount,
       todayByHour,
@@ -83,7 +84,7 @@ export function useMuskQuantAnalysis() {
       rhythmBlocks: todayRhythmBlocks(todayByHour, now),
       impacts: landingImpacts(prediction.sessions, prediction, now),
     };
-  }, [events, selectedSlug, posts, tick]);
+  }, [events, selectedSlug, posts, constants, tick]);
 }
 
 export type MuskQuantAnalysis = NonNullable<ReturnType<typeof useMuskQuantAnalysis>>;

@@ -32,6 +32,79 @@ SESSIONS = [
     ("上午会话", [20, 21, 22, 23], 0.64, 10.9, 8, 12, 4, 7.0),
 ]
 
+# 滚动重估的最小样本量（完整 BJ 天数）；不足时用上面的 206 天冻结常量
+MIN_CALIBRATION_DAYS = 21
+
+
+@dataclass
+class Constants:
+    """预测模型常量：冻结默认值或由近 N 天数据滚动重估。"""
+    daily_baseline: float = DAILY_BASELINE
+    hourly_fraction: list[float] = field(default_factory=lambda: list(HOURLY_FRACTION))
+    sessions: list[tuple] = field(default_factory=lambda: list(SESSIONS))
+    source: str = "default"     # default | live
+    days_used: int = 0
+
+
+def constants_from_daily_rows(rows: list[dict], today_bj_date: str) -> Constants:
+    """由 (BJ 日期, 小时, 计数) 行滚动重估常量。
+
+    丢弃今天（未完整）与最早一天（可能截断）；不足 MIN_CALIBRATION_DAYS 天返回默认。
+    会话阈值改为经验分位数：strong = p75、weak = p25（出现日内）；
+    expected_contrib = freq × avg（与原站常量的关系一致）。
+    """
+    by_date: dict[str, list[int]] = {}
+    for r in rows:
+        d, h, c = r["date"], int(r["hour"]), int(r["count"])
+        if d >= today_bj_date:
+            continue
+        by_date.setdefault(d, [0] * 24)[h] += c
+
+    if by_date:
+        del by_date[min(by_date)]  # 最早一天可能不完整
+
+    days = len(by_date)
+    if days < MIN_CALIBRATION_DAYS:
+        return Constants()
+
+    day_vectors = list(by_date.values())
+    day_totals = [sum(v) for v in day_vectors]
+    total = sum(day_totals)
+    if total <= 0:
+        return Constants()
+
+    daily_baseline = total / days
+    hour_sums = [sum(v[h] for v in day_vectors) for h in range(24)]
+    hourly_fraction = [s / total for s in hour_sums]
+
+    def _quantile(sorted_vals: list[int], q: float) -> float:
+        if not sorted_vals:
+            return 0.0
+        idx = q * (len(sorted_vals) - 1)
+        lo_i, hi_i = int(idx), min(int(idx) + 1, len(sorted_vals) - 1)
+        return sorted_vals[lo_i] + (sorted_vals[hi_i] - sorted_vals[lo_i]) * (idx - lo_i)
+
+    sessions = []
+    for name, hours, *_defaults in SESSIONS:
+        actuals = [sum(v[h] for h in hours) for v in day_vectors]
+        appearing = sorted(a for a in actuals if a > 0)
+        freq = len(appearing) / days
+        avg = sum(appearing) / len(appearing) if appearing else 0.0
+        med = _quantile(appearing, 0.5)
+        strong = max(1, round(_quantile(appearing, 0.75)))
+        weak = max(0, round(_quantile(appearing, 0.25)))
+        contrib = freq * avg
+        sessions.append((name, hours, round(freq, 2), round(avg, 1), round(med, 1),
+                         strong, weak, round(contrib, 1)))
+
+    return Constants(
+        daily_baseline=round(daily_baseline, 1),
+        hourly_fraction=[round(f, 4) for f in hourly_fraction],
+        sessions=sessions,
+        source="live",
+        days_used=days,
+    )
+
 
 @dataclass
 class BucketEval:
@@ -88,23 +161,31 @@ def bj_date_key(now: datetime) -> str:
 
 # ── 落点 µ（与前端同源：小时加权 + 会话修正，统一 λ）────
 
-def mu_hourly(current: int, pace: float, remaining_hours: float, now: datetime) -> float:
+def mu_hourly(
+    current: int, pace: float, remaining_hours: float, now: datetime,
+    consts: Constants | None = None,
+) -> float:
+    c = consts or Constants()
     bj = bj_now(now)
     h, frac = bj.hour, (60 - bj.minute) / 60
-    r = HOURLY_FRACTION[h] * frac
+    r = c.hourly_fraction[h] * frac
     for i in range(1, int(remaining_hours)):
-        r += HOURLY_FRACTION[(h + i) % 24]
+        r += c.hourly_fraction[(h + i) % 24]
     return round((current + pace * r) * 10) / 10
 
 
-def session_mu_adjust(today_by_hour: list[int], pace: float, now: datetime) -> int:
+def session_mu_adjust(
+    today_by_hour: list[int], pace: float, now: datetime,
+    consts: Constants | None = None,
+) -> int:
     """会话状态机的 µ 修正总量（前端 evaluateSessions 的移植，仅保留 muAdjust）。"""
+    c = consts or Constants()
     bj_h = bj_hour(now)
-    scale = pace / DAILY_BASELINE if pace > 0 else 1.0
-    has_data = any(c > 0 for c in today_by_hour)
+    scale = pace / c.daily_baseline if pace > 0 else 1.0
+    has_data = any(x > 0 for x in today_by_hour)
     total = 0
 
-    for _name, hours, freq, avg, med, strong, weak, contrib in SESSIONS:
+    for _name, hours, freq, avg, med, strong, weak, contrib in c.sessions:
         actual = sum(today_by_hour[h] for h in hours)
         start_hour, end_hour = hours[0], hours[-1]
 
@@ -141,10 +222,11 @@ def lambda_mu(
     remaining_hours: float,
     today_by_hour: list[int],
     now: datetime,
+    consts: Constants | None = None,
 ) -> float:
     """概率模型 λ：会话修正后的落点（与前端 displayLanding 同式）。"""
-    muh = mu_hourly(current, pace, remaining_hours, now)
-    adjusted = round(muh + session_mu_adjust(today_by_hour, pace, now))
+    muh = mu_hourly(current, pace, remaining_hours, now, consts)
+    adjusted = round(muh + session_mu_adjust(today_by_hour, pace, now, consts))
     return max(float(current), float(round((muh + adjusted) / 2)))
 
 
@@ -253,12 +335,13 @@ def build_alerts(
     event_slug: str,
     now: datetime,
     today_by_hour: list[int] | None = None,
+    consts: Constants | None = None,
 ) -> list[AlertCandidate]:
     alerts: list[AlertCandidate] = []
     remaining_days = remaining_hours / 24
     # λ 与前端展示落点同源（会话修正）；无小时数据时退化为线性外推
     if today_by_hour is not None:
-        mu = lambda_mu(current, pace, remaining_hours, today_by_hour, now)
+        mu = lambda_mu(current, pace, remaining_hours, today_by_hour, now, consts)
     else:
         mu = current + (remaining_hours / 24) * pace
     probs = evaluate_buckets(buckets, mu)

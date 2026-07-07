@@ -58,6 +58,27 @@ export const SESSIONS: SessionDef[] = [
   { name: '上午会话', emoji: '🏙️', bjHours: [20, 21, 22, 23], cdt: 'CDT 7–11am', freq: 0.64, avgTweets: 10.9, medTweets: 8, strongThreshold: 12, weakThreshold: 4, expectedContrib: 7 },
 ];
 
+/**
+ * 预测模型常量集：默认为上面的 206 天冻结表；
+ * 后端 /api/quant/constants 会用近 90 天数据滚动重估（马斯克发推行为非平稳，冻结表会过期）。
+ */
+export interface QuantConstants {
+  source: 'default' | 'live';
+  /** 重估用到的完整天数（default 时为 0） */
+  daysUsed: number;
+  dailyBaseline: number;
+  hourlyFraction: number[];
+  sessions: SessionDef[];
+}
+
+export const DEFAULT_CONSTANTS: QuantConstants = {
+  source: 'default',
+  daysUsed: 0,
+  dailyBaseline: DAILY_BASELINE,
+  hourlyFraction: HOURLY_FRACTION,
+  sessions: SESSIONS,
+};
+
 // ---------------------------------------------------------------------------
 // 时间/计数工具
 // ---------------------------------------------------------------------------
@@ -140,12 +161,18 @@ export function muLinear(current: number, pace: number, remainingHours: number):
 }
 
 /** 小时加权 µ：按当前 BJ 小时用历史小时分布加权剩余时间 */
-export function muHourly(current: number, pace: number, remainingHours: number, now = new Date()): number {
+export function muHourly(
+  current: number,
+  pace: number,
+  remainingHours: number,
+  now = new Date(),
+  consts: QuantConstants = DEFAULT_CONSTANTS,
+): number {
   const h = bjHour(now);
   const frac = (60 - bjMinute(now)) / 60;
-  let r = HOURLY_FRACTION[h] * frac;
+  let r = consts.hourlyFraction[h] * frac;
   for (let i = 1; i < Math.floor(remainingHours); i++) {
-    r += HOURLY_FRACTION[(h + i) % 24];
+    r += consts.hourlyFraction[(h + i) % 24];
   }
   return Math.round((current + pace * r) * 10) / 10;
 }
@@ -171,12 +198,13 @@ export function evaluateSessions(
   todayByHour: number[],
   pace: number,
   now = new Date(),
+  consts: QuantConstants = DEFAULT_CONSTANTS,
 ): { sessions: SessionStatus[]; totalMuAdjust: number } {
   const bjNow = bjHour(now);
-  const scale = pace > 0 ? pace / DAILY_BASELINE : 1;
+  const scale = pace > 0 ? pace / consts.dailyBaseline : 1;
   const hasData = todayByHour.some((c) => c > 0);
 
-  const sessions = SESSIONS.map((def): SessionStatus => {
+  const sessions = consts.sessions.map((def): SessionStatus => {
     const actual = def.bjHours.reduce((sum, h) => sum + (todayByHour[h] ?? 0), 0);
     const expected = Math.round(def.expectedContrib * scale);
     const startHour = def.bjHours[0];
@@ -263,10 +291,11 @@ export function computePrediction(
   remainingHours: number,
   todayByHour: number[],
   now = new Date(),
+  consts: QuantConstants = DEFAULT_CONSTANTS,
 ): PredictionBundle {
   const M = muLinear(current, pace, remainingHours);
-  const muH = muHourly(current, pace, remainingHours, now);
-  const { sessions, totalMuAdjust } = evaluateSessions(todayByHour, pace, now);
+  const muH = muHourly(current, pace, remainingHours, now, consts);
+  const { sessions, totalMuAdjust } = evaluateSessions(todayByHour, pace, now, consts);
   const adjusted = Math.round(muH + totalMuAdjust);
   const displayLanding = Math.max(current, Math.round((muH + adjusted) / 2));
   const expectedRemaining = (remainingHours / 24) * pace;

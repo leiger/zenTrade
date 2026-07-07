@@ -88,6 +88,29 @@ async def quant_alerts(limit: int = Query(50, ge=1, le=200), offset: int = Query
         await db.close()
 
 
+@router.get("/constants")
+async def quant_constants():
+    """预测模型常量：近 90 天滚动重估，样本不足回退 206 天冻结默认值。
+
+    sessions 元素：[name, bjHours, freq, avgTweets, medTweets, strongThreshold, weakThreshold, expectedContrib]
+    """
+    c = await poller.get_constants()
+    return {
+        "source": c.source,
+        "daysUsed": c.days_used,
+        "dailyBaseline": c.daily_baseline,
+        "hourlyFraction": c.hourly_fraction,
+        "sessions": [
+            {
+                "name": s[0], "bjHours": s[1], "freq": s[2], "avgTweets": s[3],
+                "medTweets": s[4], "strongThreshold": s[5], "weakThreshold": s[6],
+                "expectedContrib": s[7],
+            }
+            for s in c.sessions
+        ],
+    }
+
+
 @router.get("/hourly-counts")
 async def quant_hourly_counts(days: int = Query(90, ge=1, le=365)):
     """近 N 天每 (UTC 日期, 小时) 推文计数，滚动常量重估的数据源。"""
