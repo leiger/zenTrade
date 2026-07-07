@@ -83,6 +83,7 @@ class StrategyEngine:
         remaining_seconds: float,
         brackets: list[dict[str, Any]],
         market_url: str = "",
+        pace: float = 0.0,
     ) -> list[AlertCandidate]:
         """Run all enabled strategies and return alerts that should fire."""
         now = datetime.now(timezone.utc)
@@ -100,7 +101,7 @@ class StrategyEngine:
             elif stype == "tail_sweep":
                 result = self._eval_tail_sweep(sid, tracking_id, params, now, post_count, brackets, market_url)
             elif stype == "settlement_no":
-                result = self._eval_settlement_no(sid, tracking_id, params, now, post_count, remaining_seconds, brackets, market_url)
+                result = self._eval_settlement_no(sid, tracking_id, params, now, post_count, remaining_seconds, brackets, market_url, pace)
             elif stype == "panic_fade":
                 result = self._eval_panic_fade(sid, tracking_id, params, now, post_count, remaining_seconds, brackets, market_url)
             else:
@@ -198,15 +199,22 @@ class StrategyEngine:
     def _eval_settlement_no(
         self, sid: str, tracking_id: str, params: dict, now: datetime,
         post_count: int, remaining_seconds: float, brackets: list[dict], market_url: str,
+        pace: float = 0.0,
     ) -> list[AlertCandidate]:
-        remaining_hours_threshold = params.get("remaining_hours", 12)
-        min_gap = params.get("min_gap", 100)
+        remaining_hours_threshold = params.get("remaining_hours", 72)
+        min_gap = params.get("min_gap", 40)
+        pace_multiple = params.get("pace_multiple", 2.5)
         max_no_price = params.get("max_no_price", 99.5)
         interval_min = params.get("remind_interval_minutes", 120)
 
         remaining_h = remaining_seconds / 3600
         if remaining_h > remaining_hours_threshold:
             return []
+
+        # 回测结论（2026-07）：固定 gap 在节奏快的周会触发在够得着的区间上（负期望）；
+        # 所需条数 ≥ 当前节奏外推的 pace_multiple 倍才算"够不着"，min_gap 仅作下限兜底。
+        expected_remaining = pace * remaining_h / 24
+        required_gap = max(min_gap, pace_multiple * expected_remaining)
 
         alerts = []
         for b in brackets:
@@ -216,7 +224,7 @@ class StrategyEngine:
             yes_bid = b.get("yes_bid")
             no_price = round(100 - yes_bid, 2) if yes_bid is not None else b.get("no_price", 0)
 
-            if gap < min_gap:
+            if gap < required_gap:
                 continue
             if no_price >= max_no_price:
                 continue

@@ -275,6 +275,7 @@ class XMonitorPoller:
                     remaining_seconds=remaining,
                     brackets=brackets,
                     market_url=market_url,
+                    pace=float(tracking.get("_stats", {}).get("pace") or 0),
                 )
 
                 for c in candidates:
