@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BrainCircuit, BarChart3, Inbox, LogOut, Wallet, Radio, ScanSearch } from 'lucide-react';
+import { BrainCircuit, BarChart3, Inbox, LogOut, Wallet, Radio, ScanSearch, Crosshair } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { ThemeSwitcher } from '@/components/themes/theme-switcher';
@@ -27,6 +27,7 @@ const navigation = [
     label: 'Polymarket',
     items: [
       { name: 'X Monitor', href: '/x-monitor', icon: Radio, disabled: false },
+      { name: 'Musk Quant', href: '/musk-quant', icon: Crosshair, disabled: false },
       { name: 'Wallet Tracker', href: '/wallet-tracker', icon: ScanSearch, disabled: false },
     ],
   },
