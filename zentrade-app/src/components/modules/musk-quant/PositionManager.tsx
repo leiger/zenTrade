@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, Wallet } from 'lucide-react';
+import { Plus, Trash2, TriangleAlert, Wallet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,15 +94,15 @@ export function PositionManager() {
       {/* 汇总卡 */}
       <div className="grid grid-cols-3 gap-3">
         <div className="flex flex-col gap-0.5 rounded-lg border bg-gradient-to-t from-primary/5 to-card px-4 py-3">
-          <span className="text-xs text-muted-foreground">总投入</span>
+          <span className="text-sm text-muted-foreground">总投入</span>
           <span className="text-2xl tracking-wide tabular-nums">${totals.cost.toFixed(2)}</span>
         </div>
         <div className="flex flex-col gap-0.5 rounded-lg border bg-gradient-to-t from-primary/5 to-card px-4 py-3">
-          <span className="text-xs text-muted-foreground">当前估值</span>
+          <span className="text-sm text-muted-foreground">当前估值</span>
           <span className="text-2xl tracking-wide tabular-nums">${totals.value.toFixed(2)}</span>
         </div>
         <div className="flex flex-col gap-0.5 rounded-lg border bg-gradient-to-t from-primary/5 to-card px-4 py-3">
-          <span className="text-xs text-muted-foreground">浮动盈亏</span>
+          <span className="text-sm text-muted-foreground">浮动盈亏</span>
           <span
             className={cn(
               'text-2xl tracking-wide tabular-nums',
@@ -114,14 +114,15 @@ export function PositionManager() {
         </div>
       </div>
 
-      <p className="text-[10px] text-muted-foreground">
-        ⚠️ 各区间互斥，最终只有一个区间结算为 YES。当前估值与浮盈按可卖价（bid）折算，非中奖金额。
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" />
+        各区间互斥，最终只有一个区间结算为 YES。当前估值与浮盈按可卖价（bid）折算，非中奖金额。
       </p>
 
       {/* 添加仓位 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Plus className="h-4 w-4 text-primary" />
             记录持仓（{analysis.event.title}）
           </CardTitle>
@@ -129,7 +130,7 @@ export function PositionManager() {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-5">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">选择区间</Label>
+              <Label className="text-sm">选择区间</Label>
               <Select value={bucketLabel} onValueChange={handleBucketChange}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="选择区间" />
@@ -147,7 +148,7 @@ export function PositionManager() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">入场价格（¢）</Label>
+              <Label className="text-sm">入场价格（¢）</Label>
               <Input
                 className="h-9"
                 type="number"
@@ -159,7 +160,7 @@ export function PositionManager() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">投入金额（$）</Label>
+              <Label className="text-sm">投入金额（$）</Label>
               <Input
                 className="h-9"
                 type="number"
@@ -170,7 +171,7 @@ export function PositionManager() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">仓位角色</Label>
+              <Label className="text-sm">仓位角色</Label>
               <Select value={role} onValueChange={(v) => setRole(v as QuantPosition['role'])}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -186,7 +187,7 @@ export function PositionManager() {
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <p className="text-[11px] text-muted-foreground tabular-nums">
+            <p className="text-sm text-muted-foreground tabular-nums">
               {formValid
                 ? `每份 $${(priceNum / 100).toFixed(3)} · 赔率 ${(100 / priceNum).toFixed(2)}x · ≈ ${previewShares.toFixed(0)} 份 YES token`
                 : '填写区间、价格与金额后确认添加'}
@@ -201,14 +202,14 @@ export function PositionManager() {
       {/* 持仓明细 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Wallet className="h-4 w-4 text-primary" />
             持仓明细
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {evaluations.length === 0 && (
-            <p className="py-4 text-center text-xs text-muted-foreground">暂无持仓记录</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">暂无持仓记录</p>
           )}
           {evaluations.map((ev) => (
             <div
@@ -218,34 +219,34 @@ export function PositionManager() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold tabular-nums">{ev.position.bucketLabel}</span>
-                  <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                  <Badge variant="outline" className="h-4 px-1.5 text-xs">
                     {ROLE_LABELS[ev.position.role]}
                   </Badge>
                   {ev.signal && (
-                    <Badge variant="outline" className={cn('h-4 px-1.5 text-[9px]', SIGNAL_META[ev.signal].cls)}>
+                    <Badge variant="outline" className={cn('h-4 px-1.5 text-xs', SIGNAL_META[ev.signal].cls)}>
                       {SIGNAL_META[ev.signal].label}
                     </Badge>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                <p className="mt-1 text-sm text-muted-foreground tabular-nums">
                   入场 {(ev.position.entryPrice * 100).toFixed(1)}¢ · {ev.position.shares.toFixed(0)} 份 · 投入 $
                   {ev.position.cost.toFixed(2)}
                   {ev.currentPrice !== null && ` · 现价 ${(ev.currentPrice * 100).toFixed(1)}¢`}
                   {ev.modelProb !== null && ` · 模型 ${ev.modelProb.toFixed(1)}%`}
                 </p>
-                {ev.signalText && <p className="mt-0.5 text-[11px]">{ev.signalText}</p>}
+                {ev.signalText && <p className="mt-1 text-sm">{ev.signalText}</p>}
               </div>
               <div className="shrink-0 text-right">
                 <p
                   className={cn(
-                    'text-sm font-semibold tabular-nums',
+                    'text-base font-semibold tabular-nums',
                     ev.pnl > 0 ? 'text-emerald-500' : ev.pnl < 0 ? 'text-red-500' : '',
                   )}
                 >
                   {ev.pnl >= 0 ? '+' : ''}${ev.pnl.toFixed(2)}（{ev.pnlPct >= 0 ? '+' : ''}
                   {ev.pnlPct.toFixed(1)}%）
                 </p>
-                <p className="text-[10px] text-muted-foreground tabular-nums">
+                <p className="text-sm text-muted-foreground tabular-nums">
                   若命中：${ev.winValue.toFixed(0)}（+${(ev.winValue - ev.position.cost).toFixed(0)}）
                 </p>
               </div>

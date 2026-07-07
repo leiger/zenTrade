@@ -188,3 +188,22 @@ VR 主仓策略 T-72h 前全灭、盈利呈彩票型，n=8 样本下未证明正
 - 决策主线：先看「实时操作信号」→ 落点预测与精准度 → 区间定价 VR → 按阶段建仓卡执行；
   最后 48h 结合 Morphology 形态判定持仓/入场；持仓记录后自动给出止盈/止损/出场信号
 - ⚠️ 持仓存在浏览器 localStorage，清缓存会丢失；金额建议仅作记录用途
+
+## 十一、2026-07-08 融合轮：并入 X Monitor（单页 8 Tab）
+
+1. **页面合并**：`/musk-quant` 独立页移除（路由保留、redirect 到 `/x-monitor` 兼容旧书签），侧边栏 Polymarket 分组只留 X Monitor 一项。
+2. **Tab 重组**（11 → 8）：Overview（量化市场概览 + 右侧策略方案面板）/ Probability / Morphology / Rhythm（14d×24h 节奏热力图 + 7×24 周活跃热力图合并）/ Alerts（告警时间轴）/ Positions（量化持仓 + 手动交易记录）/ Strategies（策略实例 CRUD + 策略笔记）/ Guide（操作手册）。Tab 状态入 URL（`?tab=`），推送跳转 `?alert=` 自动定位 Alerts。
+3. **右侧策略方案面板** `StrategyPlanPanel.tsx`：操作阶段纪律（随剩余时间实时切换，从 MarketOverview 底部迁出）+ 回测铁律 4 条（来自 strategy-backtest-2026-07-07.md）+ 止盈阶梯/死亡陷阱提醒；xl 屏 sticky。
+4. **头部统计融合**：MonitorHeader 新增 Today、Forecast（预测落点）两格，数据来自量化引擎；手动刷新同时刷 xmonitor 与 quant 两个数据源。
+5. **市场联动**：tracking 切换按 marketLink slug 同步 quant 选中市场；无对应量化数据（如 July 6–8 短周期市场不在 elon-tweets 周度系列）时显示提示条并隐藏 Today/Forecast。
+6. **默认市场修正**：musk-quant store 默认选中第一个**未到期**市场——gamma `closed=false` 会滞后返回已结算市场，原先会默认选中剩余 0h 的死市场。
+7. **字体标准 ≥12px**：两个模块全部 `text-[8/9/10/11px]`（约 125 处）统一为 `text-xs`，热力图 tooltip 宽度相应放宽（200→220px，百分比列 32→44px）；Sidebar 两处 10px 一并提升。
+
+## 十二、2026-07-08 可读性轮：图标 / 字号 / 热力图统一
+
+1. **emoji 图标全部换成 Lucide**：新增 `QuantIcons.tsx`（WindowIcon/RhythmIcon/TimingIcon/ImpactIcon 按引擎的 tone/kind/key 映射）；引擎展示文案中的 emoji 前缀（⏰⭐🟡✅ 等）全部剥离，语义交给图标与颜色（engine 数据字段里的 emoji 保留但 UI 不再渲染）。
+2. **字号体系**：底线 12px（text-xs 仅用于 uppercase 小标签/密集表格徽章）；建议/说明正文统一 14px（text-sm）；卡片标题 16px（text-base）；落点预测主数字 text-4xl。卡片内边距整体放大一档。
+3. **形态模板放大**：六模板从一行 6 个改为 lg 下 3×2 网格（曲线 220×96），实际对比曲线 640×200；判定/建议文案 14px。
+4. **热力图统一**：删除无交互的 `RhythmHeatmap.tsx`，其两个维度并入交互式 `PostActivityHeatmap`（子 Tab：Day×Hour / **Daily 14d** / Hourly / **Today vs Baseline** / Timeline）。新维度数据来自 musk-quant 推文流水（30 天）+ 滚动常量基线，支持时区切换（基线按 BJ 定义、切时区时平移），每个格/柱 HoverCard 展示 5 分钟分桶明细，Today 视图额外显示实际 vs 基线偏离倍数（>1.5x 琥珀 / <0.4x 红）。
+5. **price-history 容错**：`fetchPriceHistory` 先走同源代理、失败回退 FastAPI 后端（dev 下 Next 代理偶发外网 fetch 失败，后端端点更稳）。
+6. 删除已无引用的 `QuantHeader.tsx`（头部已并入 MonitorHeader）。

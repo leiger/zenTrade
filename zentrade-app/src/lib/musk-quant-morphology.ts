@@ -4,6 +4,8 @@
  * 分类器根据「中心区间（绿）vs 相邻区间（红）」近 48h 小时级价格特征打分。
  */
 
+import { normalizeBrowserApiBase } from '@/lib/xmonitor-api';
+
 export type PatternKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 export interface PatternTemplate {
@@ -208,12 +210,27 @@ export function alignHourlySeries(
   return { timestamps, green, red };
 }
 
-/** 拉取单个 token 的价格历史（走本地代理） */
+/** 拉取单个 token 的价格历史：先走同源代理，失败时回退 FastAPI 后端（dev 下 Next 代理偶发外网失败） */
 export async function fetchPriceHistory(tokenId: string): Promise<{ t: number; p: number }[]> {
-  const res = await fetch(`/api/quant/price-history?tokenId=${encodeURIComponent(tokenId)}`, {
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error(`price-history api ${res.status}`);
-  const body = (await res.json()) as { history?: { t: number; p: number | string }[] };
-  return (body.history ?? []).map((p) => ({ t: p.t * 1000, p: Number(p.p) }));
+  const query = `tokenId=${encodeURIComponent(tokenId)}`;
+  const backendBase = normalizeBrowserApiBase(
+    process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api',
+  );
+  const urls = [`/api/quant/price-history?${query}`, `${backendBase}/quant/price-history?${query}`];
+
+  let lastError: Error = new Error('price-history unavailable');
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) {
+        lastError = new Error(`price-history api ${res.status}`);
+        continue;
+      }
+      const body = (await res.json()) as { history?: { t: number; p: number | string }[] };
+      return (body.history ?? []).map((p) => ({ t: p.t * 1000, p: Number(p.p) }));
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastError;
 }

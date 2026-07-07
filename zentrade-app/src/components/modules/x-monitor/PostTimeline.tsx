@@ -110,7 +110,7 @@ export function PostTimeline({ startDate, endDate }: PostTimelineProps) {
                     href={getUrlParams(post.id)}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1"
+                    className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
                   >
                     {format(new Date(post.createdAt), 'MMM d, HH:mm')}
                     <ExternalLink className="w-3 h-3" />
@@ -125,15 +125,15 @@ export function PostTimeline({ startDate, endDate }: PostTimelineProps) {
                   <div className="mt-3 flex items-center gap-4 text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MessageCircle className="w-3.5 h-3.5" />
-                      <span className="text-[10px] tabular-nums">{replyCount}</span>
+                      <span className="text-xs tabular-nums">{replyCount}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Repeat2 className="w-3.5 h-3.5" />
-                      <span className="text-[10px] tabular-nums">{rtCount}</span>
+                      <span className="text-xs tabular-nums">{rtCount}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Heart className="w-3.5 h-3.5" />
-                      <span className="text-[10px] tabular-nums">{likeCount}</span>
+                      <span className="text-xs tabular-nums">{likeCount}</span>
                     </div>
                   </div>
                 )}

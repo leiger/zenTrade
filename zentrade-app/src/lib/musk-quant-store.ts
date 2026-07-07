@@ -15,6 +15,12 @@ function remainingHoursOf(events: QuantEvent[], slug: string | null): number | n
   return Math.max(0, (new Date(event.endDate).getTime() - Date.now()) / 3600_000);
 }
 
+/** 默认选中第一个未到期的市场（gamma 的 closed=false 会滞后返回已到期市场） */
+function defaultSlugOf(events: QuantEvent[]): string | null {
+  const live = events.find((e) => new Date(e.endDate).getTime() > Date.now());
+  return live?.slug ?? events[0]?.slug ?? null;
+}
+
 const POSITIONS_KEY = 'zentrade.musk-quant.positions';
 /** 推文历史回溯天数：会话节奏与小时基线需要 ~30 天样本 */
 const HISTORY_DAYS = 30;
@@ -86,7 +92,7 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
         events,
         posts,
         constants,
-        selectedSlug: s.selectedSlug ?? events[0]?.slug ?? null,
+        selectedSlug: s.selectedSlug ?? defaultSlugOf(events),
         loading: false,
         lastUpdatedAt: new Date().toISOString(),
       }));
@@ -108,7 +114,7 @@ export const useMuskQuantStore = create<MuskQuantStore>((set, get) => ({
       set((s) => ({
         events,
         posts,
-        selectedSlug: s.selectedSlug ?? events[0]?.slug ?? null,
+        selectedSlug: s.selectedSlug ?? defaultSlugOf(events),
         refreshing: false,
         lastUpdatedAt: new Date().toISOString(),
       }));

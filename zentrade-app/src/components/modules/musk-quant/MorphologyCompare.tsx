@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { GitCompareArrows, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Clock, GitCompareArrows, MapPin, RefreshCw, Target, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -143,14 +143,14 @@ function ComparisonSection({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center justify-between text-sm">
+        <CardTitle className="flex items-center justify-between text-base">
           <span>{title}</span>
-          <span className="flex items-center gap-3 text-[10px] font-normal">
-            <span className="flex items-center gap-1">
+          <span className="flex items-center gap-3 text-sm font-normal">
+            <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded" style={{ background: GREEN }} />
               {center.bucket.label}（中心）
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded" style={{ background: RED }} />
               {comp.bucket.label}
             </span>
@@ -167,37 +167,37 @@ function ComparisonSection({
           )}
           {error && <div className="flex h-40 items-center justify-center text-xs text-destructive">价格历史加载失败：{error}</div>}
           {!loading && !error && state && (
-            <DualLineChart green={state.aligned.green} red={state.aligned.red} width={640} height={160} />
+            <DualLineChart green={state.aligned.green} red={state.aligned.red} width={640} height={200} />
           )}
         </div>
 
         {/* 形态预测结果 */}
         {prediction && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">形态预测走向：</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-sm text-muted-foreground">形态预测走向：</span>
             {matched && tpl ? (
               <>
                 <Badge
                   variant="outline"
-                  className="gap-1 text-[10px]"
+                  className="gap-1 text-sm"
                   style={{ borderColor: tpl.color, color: tpl.color }}
                 >
                   <strong>{matched}</strong> {tpl.name}
                 </Badge>
-                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted/40">
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted/40">
                   <div className="h-full rounded-full" style={{ width: `${confPct}%`, background: tpl.color }} />
                 </div>
-                <span className="text-[11px] tabular-nums text-muted-foreground">匹配 {confPct}%</span>
-                <span className="text-[11px] text-muted-foreground">{prediction.reason}</span>
+                <span className="text-sm tabular-nums text-muted-foreground">匹配 {confPct}%</span>
+                <span className="text-sm text-muted-foreground">{prediction.reason}</span>
                 {prediction.second && (
-                  <span className="text-[10px] text-muted-foreground/70">
+                  <span className="text-sm text-muted-foreground/70">
                     次可能：{prediction.second}·{PATTERN_TEMPLATES[prediction.second].name}
                   </span>
                 )}
-                <span className={cn('text-[10px]', reliability.cls)}>● {reliability.text}</span>
+                <span className={cn('text-sm', reliability.cls)}>● {reliability.text}</span>
               </>
             ) : (
-              <span className="text-[11px] text-muted-foreground">{prediction.reason}</span>
+              <span className="text-sm text-muted-foreground">{prediction.reason}</span>
             )}
           </div>
         )}
@@ -205,7 +205,7 @@ function ComparisonSection({
         {/* 行动建议卡 */}
         {tpl && (
           <div
-            className="rounded-lg border-l-2 bg-muted/20 px-3 py-2.5 text-xs leading-relaxed"
+            className="rounded-lg border-l-2 bg-muted/20 px-4 py-3 text-sm leading-relaxed"
             style={{ borderLeftColor: tpl.color }}
           >
             <strong style={{ color: tpl.color }}>预测说明 · {tpl.name}</strong>
@@ -216,12 +216,12 @@ function ComparisonSection({
           </div>
         )}
 
-        {/* 六种模板对比 */}
+        {/* 六种模板对比：一行三个，两行铺开 */}
         <div>
-          <p className="mb-2 text-[10px] text-muted-foreground">
+          <p className="mb-2.5 text-sm text-muted-foreground">
             六种历史形态模板对比（高亮 = 预测走向，基于 18 个真实市场最后 48h 曲线）
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(Object.keys(PATTERN_TEMPLATES) as PatternKey[]).map((key) => {
               const t = PATTERN_TEMPLATES[key];
               const isMatch = key === matched;
@@ -229,25 +229,25 @@ function ComparisonSection({
                 <div
                   key={key}
                   className={cn(
-                    'rounded-lg border p-2 transition-colors',
-                    isMatch ? 'bg-muted/30' : 'border-border/40 opacity-75',
+                    'rounded-lg border p-3.5 transition-colors',
+                    isMatch ? 'bg-muted/30' : 'border-border/40 opacity-80',
                   )}
                   style={isMatch ? { borderColor: t.color } : undefined}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span
-                      className="flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-sm font-bold"
                       style={{ color: t.color, background: `${t.color}22` }}
                     >
                       {key}
                     </span>
-                    <span className="truncate text-[10px] font-medium" style={isMatch ? { color: t.color } : undefined}>
+                    <span className="truncate text-sm font-semibold" style={isMatch ? { color: t.color } : undefined}>
                       {t.name}
                     </span>
-                    <span className="ml-auto text-[9px] text-muted-foreground">{t.freq}</span>
+                    <span className="ml-auto text-sm tabular-nums text-muted-foreground">{t.freq}</span>
                   </div>
-                  <DualLineChart green={t.g} red={t.r} width={160} height={56} zone={t.zone} className="mt-1.5" />
-                  <p className={cn('mt-1 truncate text-[9px]', isMatch ? 'font-semibold' : 'text-muted-foreground')} style={isMatch ? { color: t.color } : undefined}>
+                  <DualLineChart green={t.g} red={t.r} width={220} height={96} zone={t.zone} className="mt-2.5" />
+                  <p className={cn('mt-2 text-sm leading-snug', isMatch ? 'font-semibold' : 'text-muted-foreground')} style={isMatch ? { color: t.color } : undefined}>
                     {isMatch ? '↑ 预测走向此形态' : t.signal}
                   </p>
                 </div>
@@ -293,46 +293,49 @@ export function MorphologyCompare() {
       ? `${Math.floor(remainingHours * 60)} 分钟`
       : `${Math.floor(remainingHours)}h ${Math.floor((remainingHours % 1) * 60)}m`;
 
-  const relevance =
+  const relevance: { Icon: LucideIcon; iconCls: string; cls: string; text: ReactNode } =
     remainingHours <= 24
-      ? { icon: '🎯', cls: 'border-emerald-500/40 bg-emerald-500/5', text: <>最后 24 小时，形态即将确立。<strong>预测可信度最高</strong>，结合推文数量判断决策。</> }
+      ? { Icon: Target, iconCls: 'text-emerald-500', cls: 'border-emerald-500/40 bg-emerald-500/5', text: <>最后 24 小时，形态即将确立。<strong>预测可信度最高</strong>，结合推文数量判断决策。</> }
       : remainingHours <= 48
-        ? { icon: '📍', cls: 'border-amber-500/40 bg-amber-500/5', text: <>距结算 {timeStr}，进入<strong>形态关键窗口（最后 48h）</strong>，预测参考价值强。</> }
-        : { icon: '⏱', cls: 'border-border/60 bg-muted/20', text: <>距结算还有 {timeStr}，形态仍在演变中。以下预测为当前阶段参考，最后 48h 精度显著提升。</> };
+        ? { Icon: MapPin, iconCls: 'text-amber-500', cls: 'border-amber-500/40 bg-amber-500/5', text: <>距结算 {timeStr}，进入<strong>形态关键窗口（最后 48h）</strong>，预测参考价值强。</> }
+        : { Icon: Clock, iconCls: 'text-muted-foreground', cls: 'border-border/60 bg-muted/20', text: <>距结算还有 {timeStr}，形态仍在演变中。以下预测为当前阶段参考，最后 48h 精度显著提升。</> };
 
   return (
     <div className="space-y-4">
       {/* 可信度提示 + 区间标签 */}
-      <div className={cn('flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs', relevance.cls)}>
-        <span className="text-base">{relevance.icon}</span>
+      <div className={cn('flex items-center gap-2.5 rounded-lg border px-5 py-3 text-sm', relevance.cls)}>
+        <relevance.Icon className={cn('h-4 w-4 shrink-0', relevance.iconCls)} />
         <span className="leading-relaxed">{relevance.text}</span>
       </div>
 
-      <p className="rounded-lg border border-border/50 bg-muted/20 px-4 py-2 text-[10px] leading-relaxed text-muted-foreground">
-        ⚠️ 形态分类为<strong>描述性参考</strong>：模板仅来自 18 个历史市场、权重人工调校，「匹配度」是特征打分（上限
-        92%），不是统计意义上的置信度。判定结果会自动记录，攒够样本对照实际结果后再评估其预测力——在那之前，请以
-        VR 与落点预测为主要决策依据。
+      <p className="flex items-start gap-2.5 rounded-lg border border-border/50 bg-muted/20 px-5 py-3 text-sm leading-relaxed text-muted-foreground">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+        <span>
+          形态分类为<strong>描述性参考</strong>：模板仅来自 18 个历史市场、权重人工调校，「匹配度」是特征打分（上限
+          92%），不是统计意义上的置信度。判定结果会自动记录，攒够样本对照实际结果后再评估其预测力——在那之前，请以
+          VR 与落点预测为主要决策依据。
+        </span>
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <GitCompareArrows className="h-4 w-4 text-primary" />
         {below && (
-          <Badge variant="outline" className="gap-1.5 text-[10px] tabular-nums">
+          <Badge variant="outline" className="gap-1.5 text-sm tabular-nums">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: RED }} />
             {below.bucket.label} 下方 · {pricePct(below).toFixed(1)}¢
           </Badge>
         )}
-        <Badge variant="outline" className="gap-1.5 border-emerald-500/50 text-[10px] tabular-nums text-emerald-500">
+        <Badge variant="outline" className="gap-1.5 border-emerald-500/50 text-sm tabular-nums text-emerald-500">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: GREEN }} />
           {hottest.bucket.label} ★ 中心 · {pricePct(hottest).toFixed(1)}¢
         </Badge>
         {above && (
-          <Badge variant="outline" className="gap-1.5 text-[10px] tabular-nums">
+          <Badge variant="outline" className="gap-1.5 text-sm tabular-nums">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: RED }} />
             {above.bucket.label} 上方 · {pricePct(above).toFixed(1)}¢
           </Badge>
         )}
-        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+        <span className="ml-auto text-sm text-muted-foreground tabular-nums">
           已计 {total} 条 · 线性预测 ~{prediction.predictedTotal} 条
         </span>
       </div>

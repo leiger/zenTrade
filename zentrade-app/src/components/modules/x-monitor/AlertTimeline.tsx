@@ -151,7 +151,7 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
                             <Icon className="h-3.5 w-3.5" />
                           </div>
                           <div className="flex flex-col leading-none gap-0.5">
-                            <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-widest leading-none">
+                            <span className="text-xs font-medium text-muted-foreground/50 uppercase tracking-widest leading-none">
                               {STRATEGY_TYPE_LABELS[alert.strategyType]}
                             </span>
                             <span className="text-[13px] text-foreground tabular-nums tracking-tight leading-none" suppressHydrationWarning>
@@ -177,7 +177,7 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
                                 : <ThumbsDown className="h-3.5 w-3.5" />
                               }
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                            <span className="text-xs font-black uppercase tracking-widest leading-none">
                               {alert.feedback === 'yes' ? 'Acted' : 'Skipped'}
                             </span>
                           </div>
@@ -187,7 +187,7 @@ export function AlertTimeline({ alerts, highlightAlertId, onFeedback, onClearHig
                               <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-amber-400 opacity-60" />
                               <Bell className="h-3.5 w-3.5 text-amber-500 relative z-10" />
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest leading-none text-amber-600 animate-pulse">
+                            <span className="text-xs font-black uppercase tracking-widest leading-none text-amber-600 animate-pulse">
                               Pending
                             </span>
                           </div>
@@ -278,7 +278,7 @@ function TriggerDataDisplay({ data, strategyType }: { data: Record<string, unkno
       <div className="space-y-1.5 rounded-md border bg-muted/30 p-2.5">
         {matched.slice(0, 5).map((mb, i) => (
           <div key={i} className="flex items-center gap-3 text-xs">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium shrink-0">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium shrink-0">
               {String(mb.bracket)}
             </Badge>
             <span className="text-muted-foreground">need {String(mb.gap)} more</span>
@@ -304,7 +304,7 @@ function TriggerDataDisplay({ data, strategyType }: { data: Record<string, unkno
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {items.map((item) => (
-        <Badge key={item.label} variant="outline" className="text-[11px] px-1.5 py-0 font-normal gap-1">
+        <Badge key={item.label} variant="outline" className="text-xs px-1.5 py-0 font-normal gap-1">
           <span className="text-muted-foreground">{item.label}</span>
           <span className="font-medium">{item.value}</span>
         </Badge>

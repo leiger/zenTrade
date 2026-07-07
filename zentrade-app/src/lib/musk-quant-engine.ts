@@ -551,10 +551,10 @@ export function buildEntryStructure(probs: BucketProb[]): EntryStructure {
   const verdict = mainVr >= 1.2 ? 'enter' : mainVr >= 1.0 ? 'marginal' : 'wait';
   const verdictText =
     verdict === 'enter'
-      ? '✅ 有入场价值，可执行建仓'
+      ? '有入场价值，可执行建仓'
       : verdict === 'marginal'
-        ? '🟡 勉强可入，等更好时机'
-        : '❌ 无正期望入场点，等待价格回调';
+        ? '勉强可入，等更好时机'
+        : '无正期望入场点，等待价格回调';
 
   return { main, protect, highOdds, verdict, verdictText };
 }
@@ -605,7 +605,7 @@ export function buildPhaseEntryPlan(
 
   if (e > 48) {
     return {
-      kind: 'light', title: '🟡 轻仓布局（第3天）',
+      kind: 'light', title: '轻仓布局（第3天）',
       center, protectUp, protectDown,
       centerBudget: '$80–130', protectBudget: '各 $30–50',
       noPlays: [], yesPlays: [],
@@ -613,7 +613,7 @@ export function buildPhaseEntryPlan(
   }
   if (e > 36) {
     return {
-      kind: 'main', title: '🟢 主力建仓窗口（第1–2天）',
+      kind: 'main', title: '主力建仓窗口（第1–2天）',
       center, protectUp, protectDown,
       centerBudget: '$170–210', protectBudget: '各 $50–70',
       noPlays: [], yesPlays: [],
@@ -640,7 +640,7 @@ export function buildPhaseEntryPlan(
     .map((p) => ({ prob: p, multiple: Math.round(100 / p.askPct) }));
 
   return {
-    kind: 'endgame', title: '🔴 最后1.5天 · 博弈高倍价差',
+    kind: 'endgame', title: '最后1.5天 · 博弈高倍价差',
     center, protectUp: null, protectDown: null,
     centerBudget: '', protectBudget: '',
     noPlays, yesPlays,
@@ -712,30 +712,30 @@ export function operationPhase(remainingDays: number): OperationPhase | null {
   }
   if (remainingDays >= 2.5) {
     return {
-      key: 'phase_entry1', title: '⏰ 建仓窗口开启（早期）', muError: '±50条',
+      key: 'phase_entry1', title: '建仓窗口开启（早期）', muError: '±50条',
       actions: ['µ 不确定性仍大：无正期望（VR<1）→ 观望', '有价值区间 → 轻仓 ≤25% 试探', '中心高估 → 主仓看两侧区间，不买中心', '等 1.5–2 天 µ 稳定后再加主仓'],
     };
   }
   if (remainingDays >= 1.5) {
     return {
-      key: 'phase_entry2', title: '⏰ 主力建仓窗口', muError: '±20条',
+      key: 'phase_entry2', title: '主力建仓窗口', muError: '±20条',
       actions: ['µ 精度提升，最佳入场时机', 'VR<1 → 不要为了入场而入场', '中心高估 → 主仓移至价值比更高区间', '按三层入场结构执行（主仓/保护仓/高赔率仓）'],
     };
   }
   if (remainingDays >= 1) {
     return {
-      key: 'phase_hold1', title: '⏰ 持仓评估阶段', muError: '±12条',
+      key: 'phase_hold1', title: '持仓评估阶段', muError: '±12条',
       actions: ['检查持仓 VR 是否 ≥1.0、µ 是否仍在区间内', '换仓在死区 BJ 17:30 执行', 'µ 偏移 >1.5σ（约25-30条）才考虑换仓', '上/下翼各卖出 40%，同时评估超额收益机会'],
     };
   }
   if (remainingDays >= 0.5) {
     return {
-      key: 'phase_hold2', title: '⏰ 止盈评估阶段', muError: '±8条',
+      key: 'phase_hold2', title: '止盈评估阶段', muError: '±8条',
       actions: ['µ 非常稳定：>75¢ → 卖 50% 锁利，剩余博到期 $1', '>85¢ → 大部分止盈', '亏损仓位且 VR<0.8 → 死区出场，不拖延', '翼仓再卖剩余 50%（只剩最初 30% 仓位）'],
     };
   }
   return {
-    key: 'phase_final', title: '⏰ 最终阶段 · 临近结算', muError: '±8条',
+    key: 'phase_final', title: '最终阶段 · 临近结算', muError: '±8条',
     actions: ['亏损仓位：现在出，不再等（死亡陷阱：「再等等看」）', '盈利仓位：持有到期，或已止盈 50% → 不动', '>85¢ 可全部止盈', '到期前 12 小时：翼仓全部清仓，专注等待中心结算'],
   };
 }
@@ -775,27 +775,27 @@ export function timingBadge(sessions: SessionStatus[], now = new Date()): Timing
   const evening = find('傍晚会话');
 
   if (h === 12 && m <= 35) {
-    return { key: 'BEST', title: '⭐⭐ 最佳建仓时机', detail: '深夜会话窗口将在 25min 内开启，历史 +150% 跳跃即将发生' };
+    return { key: 'BEST', title: '最佳建仓时机', detail: '深夜会话窗口将在 25min 内开启，历史 +150% 跳跃即将发生' };
   }
   if (lateNight && (lateNight.state === 'ongoing' || lateNight.state === 'strong')) {
-    return { key: 'ACTIVE', title: '🌙 深夜会话进行中', detail: '全天最强会话（均值14条），µ 正在上移，评估止盈时机' };
+    return { key: 'ACTIVE', title: '深夜会话进行中', detail: '全天最强会话（均值14条），µ 正在上移，评估止盈时机' };
   }
   if (h === 21 && m <= 35) {
-    return { key: 'GOOD', title: '⭐ 上午会话前建仓', detail: '上午会话（64%频率）即将在 BJ 22:00 开启' };
+    return { key: 'GOOD', title: '上午会话前建仓', detail: '上午会话（64%频率）即将在 BJ 22:00 开启' };
   }
   if (morning && (morning.state === 'ongoing' || morning.state === 'strong')) {
-    return { key: 'ACTIVE', title: '🏙️ 上午会话进行中', detail: 'CDT 9–11am 活跃期，第二强信号，注意是否接近结束' };
+    return { key: 'ACTIVE', title: '上午会话进行中', detail: 'CDT 9–11am 活跃期，第二强信号，注意是否接近结束' };
   }
   if (h >= 17 && h <= 19) {
-    return { key: 'DEAD', title: '💤 睡眠沉默期', detail: 'µ 冻结，适合冷静评估/剪仓' };
+    return { key: 'DEAD', title: '睡眠沉默期', detail: 'µ 冻结，适合冷静评估/剪仓' };
   }
   if (h >= 8 && h <= 11) {
-    return { key: 'LOW', title: '🔵 深夜前过渡期', detail: 'CDT 7–10pm 低谷，等 BJ 12:00' };
+    return { key: 'LOW', title: '深夜前过渡期', detail: 'CDT 7–10pm 低谷，等 BJ 12:00' };
   }
   if (evening && (evening.state === 'ongoing' || evening.state === 'strong')) {
-    return { key: 'WATCH', title: '🌆 傍晚会话进行中', detail: '傍晚会话（51%频率），若出现则 65% 概率今晚有深夜会话' };
+    return { key: 'WATCH', title: '傍晚会话进行中', detail: '傍晚会话（51%频率），若出现则 65% 概率今晚有深夜会话' };
   }
-  return { key: 'NEUTRAL', title: '🟡 过渡时段', detail: '活跃度中等，等待下一个会话窗口' };
+  return { key: 'NEUTRAL', title: '过渡时段', detail: '活跃度中等，等待下一个会话窗口' };
 }
 
 export interface RhythmBlock {

@@ -7,6 +7,8 @@ import { DateRangePicker } from '@/components/ui/date-picker';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { fetchPostStats, type PostActivityStats } from '@/lib/xmonitor-api';
 import { useXMonitorStore } from '@/lib/xmonitor-store';
+import { useMuskQuantStore } from '@/lib/musk-quant-store';
+import type { ElonPost } from '@/types/musk-quant';
 import { cn } from '@/lib/utils';
 import { PostTimeline } from '@/components/modules/x-monitor/PostTimeline';
 
@@ -112,6 +114,48 @@ function getNowInTz(offset: number): { day: number; hour: number } {
   };
 }
 
+/* ── Daily rows（来自 musk-quant 推文流水，按所选时区聚合） ── */
+
+const DAILY_DAYS = 14;
+
+interface DailyRow {
+  key: string;
+  hours: number[];
+  minutes: number[][];
+  total: number;
+}
+
+function emptyDaily(): { hours: number[]; minutes: number[][] } {
+  return {
+    hours: Array<number>(24).fill(0),
+    minutes: Array.from({ length: 24 }, () => Array<number>(12).fill(0)),
+  };
+}
+
+function buildDailyRows(posts: ElonPost[], tzOffset: number, now: Date): DailyRow[] {
+  const map = new Map<string, { hours: number[]; minutes: number[][] }>();
+  for (const p of posts) {
+    const shifted = new Date(new Date(p.createdAt).getTime() + tzOffset * 3_600_000);
+    const key = shifted.toISOString().slice(0, 10);
+    let e = map.get(key);
+    if (!e) {
+      e = emptyDaily();
+      map.set(key, e);
+    }
+    const h = shifted.getUTCHours();
+    e.hours[h]++;
+    e.minutes[h][Math.floor(shifted.getUTCMinutes() / 5)]++;
+  }
+  const nowShift = new Date(now.getTime() + tzOffset * 3_600_000);
+  const rows: DailyRow[] = [];
+  for (let i = DAILY_DAYS - 1; i >= 0; i--) {
+    const key = new Date(nowShift.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+    const e = map.get(key) ?? emptyDaily();
+    rows.push({ key, hours: e.hours, minutes: e.minutes, total: e.hours.reduce((a, b) => a + b, 0) });
+  }
+  return rows;
+}
+
 export function PostActivityHeatmap() {
   const [preset, setPreset] = useState<Preset>('1d');
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
@@ -123,6 +167,16 @@ export function PostActivityHeatmap() {
 
   const status = useXMonitorStore((s) => s.status);
   const lastPolledAt = status?.lastPolledAt;
+
+  // Daily / Today 视图的数据源：musk-quant 推文流水 + 滚动常量基线
+  const quantPosts = useMuskQuantStore((s) => s.posts);
+  const quantConstants = useMuskQuantStore((s) => s.constants);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const loadStats = useCallback(async (start?: string, end?: string) => {
     setLoading(true);
@@ -177,6 +231,20 @@ export function PostActivityHeatmap() {
     () => (stats ? shiftStatsForTz(stats, tzOffset) : null),
     [stats, tzOffset]
   );
+
+  const dailyRows = useMemo(
+    () => buildDailyRows(quantPosts, tzOffset, now),
+    [quantPosts, tzOffset, now]
+  );
+
+  // 历史基线（常量表按 BJ 小时定义，切时区时平移）
+  const baseline = useMemo(() => {
+    const shift = tzOffset - 8;
+    return Array.from({ length: 24 }, (_, h) => {
+      const bj = ((h - shift) % 24 + 24) % 24;
+      return quantConstants.hourlyFraction[bj] * quantConstants.dailyBaseline;
+    });
+  }, [quantConstants, tzOffset]);
 
   const rangeLabel =
     isCustom && customFrom && customTo ? `Custom Range` : getPresetRange(preset).label;
@@ -233,14 +301,20 @@ export function PostActivityHeatmap() {
       ) : shiftedStats ? (
         <Tabs defaultValue="day-hour" className="w-full gap-1">
           <div className="flex items-center justify-between gap-3">
-            <TabsList className="!h-6 p-0.5">
-              <TabsTrigger value="day-hour" className="text-xs px-2 h-5">
+            <TabsList className="!h-7 p-0.5">
+              <TabsTrigger value="day-hour" className="text-xs px-2.5 h-6">
                 Day × Hour
               </TabsTrigger>
-              <TabsTrigger value="hourly" className="text-xs px-2 h-5">
+              <TabsTrigger value="daily" className="text-xs px-2.5 h-6">
+                Daily 14d
+              </TabsTrigger>
+              <TabsTrigger value="hourly" className="text-xs px-2.5 h-6">
                 Hourly Heatmap
               </TabsTrigger>
-              <TabsTrigger value="timeline" className="text-xs px-2 h-5">
+              <TabsTrigger value="today" className="text-xs px-2.5 h-6">
+                Today vs Baseline
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs px-2.5 h-6">
                 Timeline
               </TabsTrigger>
             </TabsList>
@@ -252,7 +326,7 @@ export function PostActivityHeatmap() {
                     key={k}
                     onClick={() => setTzKey(k)}
                     className={cn(
-                      'rounded px-2 py-0.5 text-[10px] font-medium transition-all',
+                      'rounded px-2 py-0.5 text-xs font-medium transition-all',
                       tzKey === k
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
@@ -270,8 +344,21 @@ export function PostActivityHeatmap() {
             <DayHourMatrix stats={shiftedStats} maxVal={maxVal} tzOffset={tzOffset} />
           </TabsContent>
 
+          <TabsContent value="daily" className="mt-3">
+            <DailyMatrix rows={dailyRows} tzOffset={tzOffset} now={now} />
+          </TabsContent>
+
           <TabsContent value="hourly" className="mt-3">
             <HourlyHeatmap stats={shiftedStats} maxVal={maxHourVal} tzOffset={tzOffset} />
+          </TabsContent>
+
+          <TabsContent value="today" className="mt-3">
+            <TodayVsBaseline
+              row={dailyRows[dailyRows.length - 1]}
+              baseline={baseline}
+              tzOffset={tzOffset}
+              baselineSource={quantConstants.source === 'live' ? `近 ${quantConstants.daysUsed} 天滚动均值` : '206 天冻结均值'}
+            />
           </TabsContent>
 
           <TabsContent value="timeline" className="mt-3">
@@ -303,19 +390,19 @@ function DayHourMatrix({
     <div className="rounded-xl border bg-card p-4 overflow-x-auto">
       <h3 className="text-sm font-semibold mb-3 italic text-foreground/80 flex flex-wrap items-center gap-2">
         Day of Week × Hour Matrix
-        <span className="text-[10px] font-normal text-muted-foreground not-italic">
+        <span className="text-xs font-normal text-muted-foreground not-italic">
           (Hover a cell for 5-min breakdown)
         </span>
       </h3>
       <table className="w-full border-separate border-spacing-[3px]">
         <thead>
           <tr>
-            <th className="w-12 text-[10px] font-medium text-muted-foreground text-left">Day</th>
+            <th className="w-12 text-xs font-medium text-muted-foreground text-left">Day</th>
             {HOURS.map((h, hi) => (
               <th
                 key={h}
                 className={cn(
-                  'text-[10px] font-medium text-center w-[38px]',
+                  'text-xs font-medium text-center w-[38px]',
                   hi === nowHour
                     ? 'text-primary font-bold'
                     : 'text-muted-foreground'
@@ -324,7 +411,7 @@ function DayHourMatrix({
                 {h}
               </th>
             ))}
-            <th className="text-[10px] font-semibold text-foreground/70 text-center w-[48px]">
+            <th className="text-xs font-semibold text-foreground/70 text-center w-[48px]">
               Total
             </th>
           </tr>
@@ -334,7 +421,7 @@ function DayHourMatrix({
             <tr key={day}>
               <td
                 className={cn(
-                  'text-[11px] font-semibold pr-1',
+                  'text-xs font-semibold pr-1',
                   di === nowDay ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
@@ -342,7 +429,7 @@ function DayHourMatrix({
               </td>
               {stats.matrix[di].map((val, hi) => {
                 const cellClass = cn(
-                  'text-center text-[11px] font-medium rounded-md py-1.5 transition-colors',
+                  'text-center text-xs font-medium rounded-md py-1.5 transition-colors',
                   cellColor(val, maxVal),
                   di === nowDay && hi === nowHour && 'ring-2 ring-primary shadow-sm'
                 );
@@ -364,7 +451,7 @@ function DayHourMatrix({
                       <HoverCardContent
                         side="top"
                         sideOffset={8}
-                        className="w-[200px] p-3 pointer-events-none"
+                        className="w-[220px] p-3 pointer-events-none"
                       >
                         <BucketDetail
                           hour={hi}
@@ -377,19 +464,19 @@ function DayHourMatrix({
                   </td>
                 );
               })}
-              <td className="text-center text-[11px] font-bold text-amber-500 tabular-nums">
+              <td className="text-center text-xs font-bold text-amber-500 tabular-nums">
                 {stats.day_totals[di].toLocaleString()}
               </td>
             </tr>
           ))}
           {/* Totals row */}
           <tr>
-            <td className="text-[10px] font-medium uppercase text-muted-foreground/60">Total</td>
+            <td className="text-xs font-medium uppercase text-muted-foreground/60">Total</td>
             {stats.hour_totals.map((val, hi) => (
               <td
                 key={hi}
                 className={cn(
-                  'text-center text-[10px] font-semibold tabular-nums',
+                  'text-center text-xs font-semibold tabular-nums',
                   hi === nowHour
                     ? 'text-primary font-bold'
                     : 'text-muted-foreground'
@@ -398,7 +485,7 @@ function DayHourMatrix({
                 {val}
               </td>
             ))}
-            <td className="text-center text-[11px] font-extrabold text-amber-400 tabular-nums">
+            <td className="text-center text-xs font-extrabold text-amber-400 tabular-nums">
               {stats.total_posts.toLocaleString()}
             </td>
           </tr>
@@ -433,14 +520,14 @@ function HourlyHeatmap({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <h3 className="text-sm font-semibold italic text-foreground/80 flex items-center gap-2">
           Hourly Post Distribution
-          <span className="text-[10px] font-normal text-muted-foreground not-italic">
+          <span className="text-xs font-normal text-muted-foreground not-italic">
             (Hover a bar for 5-min breakdown)
           </span>
         </h3>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               Peak Hour
             </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
@@ -449,7 +536,7 @@ function HourlyHeatmap({
           </div>
           <div className="h-3 w-[1px] bg-border/60" />
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               Peak Count
             </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
@@ -458,7 +545,7 @@ function HourlyHeatmap({
           </div>
           <div className="h-3 w-[1px] bg-border/60" />
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               Avg / Hr
             </span>
             <span className="text-xs font-bold tabular-nums text-foreground">
@@ -486,7 +573,7 @@ function HourlyHeatmap({
                     onMouseEnter={() => setHoveredHour(i)}
                     onMouseLeave={() => setHoveredHour(null)}
                   >
-                    <span className="text-[9px] font-medium text-foreground/70 tabular-nums mb-1"></span>
+                    <span className="text-xs font-medium text-foreground/70 tabular-nums mb-1"></span>
                     <div
                       className={cn(
                         'w-full rounded-t-sm transition-all bg-muted/30',
@@ -509,7 +596,7 @@ function HourlyHeatmap({
                     >
                       <span
                         className={cn(
-                          'text-[9px] font-medium tabular-nums mb-1',
+                          'text-xs font-medium tabular-nums mb-1',
                           isNow ? 'text-primary font-bold' : 'text-foreground/70'
                         )}
                       >
@@ -535,7 +622,7 @@ function HourlyHeatmap({
                   <HoverCardContent
                     side="top"
                     sideOffset={8}
-                    className="w-[200px] p-3 pointer-events-none"
+                    className="w-[220px] p-3 pointer-events-none"
                   >
                     <BucketDetail hour={i} buckets={stats.minute_buckets[i]} hourTotal={val} />
                   </HoverCardContent>
@@ -550,7 +637,7 @@ function HourlyHeatmap({
               <div
                 key={h}
                 className={cn(
-                  'flex-1 text-center text-[10px] font-medium transition-colors',
+                  'flex-1 text-center text-xs font-medium transition-colors',
                   i === nowHour
                     ? 'text-primary font-bold'
                     : hoveredHour === i
@@ -586,9 +673,9 @@ function BucketDetail({
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[11px] font-semibold text-foreground mb-2">
+      <div className="text-xs font-semibold text-foreground mb-2">
         {dayLabel ? (
-          <span className="block text-[10px] font-medium text-muted-foreground mb-0.5">{dayLabel}</span>
+          <span className="block text-xs font-medium text-muted-foreground mb-0.5">{dayLabel}</span>
         ) : null}
         {HOURS[hour]}:00 – {HOURS[hour]}:59
         <span className="text-muted-foreground font-normal ml-1.5">({hourTotal} posts)</span>
@@ -599,7 +686,7 @@ function BucketDetail({
         const barWidth = maxBucket > 0 ? (count / maxBucket) * 100 : 0;
         return (
           <div key={bi} className="flex items-center gap-1.5">
-            <span className="text-[9px] font-medium text-muted-foreground w-[34px] shrink-0 tabular-nums">
+            <span className="text-xs font-medium text-muted-foreground w-[34px] shrink-0 tabular-nums">
               :{label.split('–')[0]}
             </span>
             <div className="flex-1 h-[14px] bg-muted/30 rounded-sm overflow-hidden">
@@ -611,15 +698,288 @@ function BucketDetail({
                 style={{ width: `${barWidth}%` }}
               />
             </div>
-            <span className="text-[9px] font-semibold tabular-nums w-[22px] text-right text-foreground/80">
+            <span className="text-xs font-semibold tabular-nums w-[22px] text-right text-foreground/80">
               {count}
             </span>
-            <span className="text-[8px] text-muted-foreground w-[32px] text-right tabular-nums">
+            <span className="text-xs text-muted-foreground w-[44px] text-right tabular-nums">
               {pct}%
             </span>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ── Daily × Hour Matrix（近 14 天逐日，悬停看 5 分钟明细） ── */
+
+function DailyMatrix({ rows, tzOffset, now }: { rows: DailyRow[]; tzOffset: number; now: Date }) {
+  const { hour: nowHour } = getNowInTz(tzOffset);
+  const todayKey = new Date(now.getTime() + tzOffset * 3_600_000).toISOString().slice(0, 10);
+  const maxVal = Math.max(1, ...rows.flatMap((r) => r.hours));
+
+  // 历史小时均值（不含今天），底部对照行
+  const histRows = rows.filter((r) => r.key !== todayKey);
+  const hourlyAvg = Array.from({ length: 24 }, (_, h) =>
+    histRows.length ? histRows.reduce((s, r) => s + r.hours[h], 0) / histRows.length : 0,
+  );
+
+  return (
+    <div className="rounded-xl border bg-card p-4 overflow-x-auto">
+      <h3 className="text-sm font-semibold mb-3 italic text-foreground/80 flex flex-wrap items-center gap-2">
+        Daily × Hour Matrix (Last {DAILY_DAYS} Days)
+        <span className="text-xs font-normal text-muted-foreground not-italic">
+          (Hover a cell for 5-min breakdown · source: xtracker posts)
+        </span>
+      </h3>
+      <table className="w-full border-separate border-spacing-[3px]">
+        <thead>
+          <tr>
+            <th className="w-16 text-xs font-medium text-muted-foreground text-left">Date</th>
+            {HOURS.map((h, hi) => (
+              <th
+                key={h}
+                className={cn(
+                  'text-xs font-medium text-center w-[38px]',
+                  hi === nowHour ? 'text-primary font-bold' : 'text-muted-foreground',
+                )}
+              >
+                {h}
+              </th>
+            ))}
+            <th className="text-xs font-semibold text-foreground/70 text-center w-[48px]">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const isToday = row.key === todayKey;
+            return (
+              <tr key={row.key}>
+                <td
+                  className={cn(
+                    'text-xs font-semibold pr-1 tabular-nums whitespace-nowrap',
+                    isToday ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                >
+                  {row.key.slice(5)}
+                  {isToday && ' ·今'}
+                </td>
+                {row.hours.map((val, hi) => {
+                  const cellClass = cn(
+                    'text-center text-xs font-medium rounded-md py-1.5 transition-colors',
+                    cellColor(val, maxVal),
+                    isToday && hi === nowHour && 'ring-2 ring-primary shadow-sm',
+                  );
+                  if (val === 0) {
+                    return (
+                      <td key={hi} className={cellClass}>
+                        {' '}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={hi} className="p-0 align-middle">
+                      <HoverCard openDelay={0} closeDelay={0}>
+                        <HoverCardTrigger asChild>
+                          <div className={cn(cellClass, 'cursor-pointer w-full min-h-[2rem] flex items-center justify-center')}>
+                            {val}
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="top" sideOffset={8} className="w-[220px] p-3 pointer-events-none">
+                          <BucketDetail hour={hi} buckets={row.minutes[hi]} hourTotal={val} dayLabel={row.key} />
+                        </HoverCardContent>
+                      </HoverCard>
+                    </td>
+                  );
+                })}
+                <td className="text-center text-xs font-bold text-amber-500 tabular-nums">{row.total}</td>
+              </tr>
+            );
+          })}
+          {/* 历史小时均值对照行 */}
+          <tr>
+            <td className="text-xs font-medium uppercase text-muted-foreground/60">Avg</td>
+            {hourlyAvg.map((avg, hi) => (
+              <td
+                key={hi}
+                className={cn(
+                  'text-center text-xs font-semibold tabular-nums',
+                  hi === nowHour ? 'text-primary font-bold' : 'text-muted-foreground',
+                )}
+              >
+                {avg >= 0.05 ? avg.toFixed(1) : '·'}
+              </td>
+            ))}
+            <td className="text-center text-xs font-extrabold text-amber-400 tabular-nums">
+              {hourlyAvg.reduce((a, b) => a + b, 0).toFixed(0)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Today vs Baseline（今日实际 vs 历史小时基线，悬停看明细） ── */
+
+function TodayVsBaseline({
+  row,
+  baseline,
+  tzOffset,
+  baselineSource,
+}: {
+  row: DailyRow | undefined;
+  baseline: number[];
+  tzOffset: number;
+  baselineSource: string;
+}) {
+  const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+  const { hour: nowHour } = getNowInTz(tzOffset);
+  const today = row?.hours ?? Array<number>(24).fill(0);
+  const denom = Math.max(...baseline, ...today, 1);
+  const cumActual = today.slice(0, nowHour + 1).reduce((a, b) => a + b, 0);
+  const cumBase = baseline.slice(0, nowHour + 1).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="rounded-xl border bg-card p-4 overflow-x-auto">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h3 className="text-sm font-semibold italic text-foreground/80 flex items-center gap-2">
+          Today vs Baseline
+          <span className="text-xs font-normal text-muted-foreground not-italic">
+            (前景 = 今日实际 · 背景 = 历史小时均值，{baselineSource})
+          </span>
+        </h3>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Today</span>
+            <span className="text-xs font-bold tabular-nums text-foreground">{cumActual}</span>
+          </div>
+          <div className="h-3 w-[1px] bg-border/60" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Baseline (so far)</span>
+            <span className="text-xs font-bold tabular-nums text-foreground">{cumBase.toFixed(1)}</span>
+          </div>
+          <div className="h-3 w-[1px] bg-border/60" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Ratio</span>
+            <span
+              className={cn(
+                'text-xs font-bold tabular-nums',
+                cumBase > 0 && cumActual / cumBase > 1.5
+                  ? 'text-amber-500'
+                  : cumBase > 0 && cumActual / cumBase < 0.4
+                    ? 'text-red-500'
+                    : 'text-foreground',
+              )}
+            >
+              {cumBase > 0 ? `${(cumActual / cumBase).toFixed(2)}x` : '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-end gap-1 h-[180px] mb-2">
+        {baseline.map((base, i) => {
+          const isPast = i <= nowHour;
+          const actual = isPast ? today[i] : 0;
+          const isNow = i === nowHour;
+          // 今日柱颜色：超预期 1.5x 琥珀深 / 低于 0.4x 红 / 正常琥珀
+          const actualCls =
+            actual > base * 1.5 ? 'bg-amber-400' : isPast && base > 0.3 && actual < base * 0.4 ? 'bg-red-500/80' : 'bg-amber-500/70';
+          return (
+            <HoverCard key={i} openDelay={0} closeDelay={0}>
+              <HoverCardTrigger asChild>
+                <div
+                  className="relative flex-1 flex flex-col items-center justify-end h-full cursor-pointer"
+                  onMouseEnter={() => setHoveredHour(i)}
+                  onMouseLeave={() => setHoveredHour(null)}
+                >
+                  {isPast && actual > 0 && (
+                    <span className={cn('text-xs font-medium tabular-nums mb-1', isNow ? 'text-primary font-bold' : 'text-foreground/70')}>
+                      {actual}
+                    </span>
+                  )}
+                  <div className="relative w-full h-full flex items-end">
+                    <div
+                      className={cn(
+                        'absolute bottom-0 w-full rounded-t-sm bg-muted-foreground/20',
+                        hoveredHour === i && 'bg-muted-foreground/30',
+                      )}
+                      style={{ height: `${Math.max((base / denom) * 100, 1.5)}%` }}
+                    />
+                    {isPast && actual > 0 && (
+                      <div
+                        className={cn(
+                          'absolute bottom-0 left-[18%] w-[64%] rounded-t-sm transition-all',
+                          actualCls,
+                          hoveredHour === i && 'ring-2 ring-primary/50',
+                          isNow && 'ring-2 ring-primary shadow-sm',
+                        )}
+                        style={{ height: `${(actual / denom) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" sideOffset={8} className="w-[220px] p-3 pointer-events-none">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-semibold text-foreground">
+                    {HOURS[i]}:00 – {HOURS[i]}:59
+                  </div>
+                  <div className="flex items-center justify-between text-xs tabular-nums">
+                    <span className="text-muted-foreground">今日实际</span>
+                    <span className="font-semibold">{isPast ? actual : '未到'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs tabular-nums">
+                    <span className="text-muted-foreground">历史均值</span>
+                    <span className="font-semibold">{base.toFixed(2)}</span>
+                  </div>
+                  {isPast && base > 0 && (
+                    <div className="flex items-center justify-between text-xs tabular-nums">
+                      <span className="text-muted-foreground">偏离</span>
+                      <span
+                        className={cn(
+                          'font-semibold',
+                          actual > base * 1.5 ? 'text-amber-500' : actual < base * 0.4 ? 'text-red-500' : 'text-foreground',
+                        )}
+                      >
+                        {(actual / base).toFixed(2)}x
+                      </span>
+                    </div>
+                  )}
+                  {isPast && actual > 0 && row && (
+                    <div className="border-t border-border/50 pt-1.5">
+                      <BucketDetail hour={i} buckets={row.minutes[i]} hourTotal={actual} />
+                    </div>
+                  )}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          );
+        })}
+      </div>
+
+      {/* Hour labels */}
+      <div className="flex gap-1">
+        {HOURS.map((h, i) => (
+          <div
+            key={h}
+            className={cn(
+              'flex-1 text-center text-xs font-medium transition-colors',
+              i === nowHour || hoveredHour === i ? 'text-primary font-bold' : 'text-muted-foreground',
+            )}
+          >
+            {h}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500/70" />实际（正常）</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" />超预期（&gt;1.5x）</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-red-500/80" />低于预期 40%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-muted-foreground/20" />历史基线</span>
+      </div>
     </div>
   );
 }
@@ -645,7 +1005,7 @@ function ClockDisplay({ tzKey }: { tzKey: TzKey }) {
   const keys: TzKey[] = ['utc', 'cn', 'et'];
 
   return (
-    <div className="flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground shrink-0">
+    <div className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground shrink-0">
       {keys.map((k, i) => (
         <span key={k} className="flex items-center gap-1.5">
           {i > 0 && <span className="text-border">·</span>}

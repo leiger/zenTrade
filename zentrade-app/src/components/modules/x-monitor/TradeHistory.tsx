@@ -322,7 +322,7 @@ export function TradeHistory() {
                     record.tags.map((tag) => (
                       <span
                         key={tag.id}
-                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium"
                         style={tagStyle(tag.color)}
                       >
                         {tag.name}
@@ -377,7 +377,7 @@ export function TradeHistory() {
               </div>
 
               {/* 底部日期 */}
-              <span className="mt-2 block text-[10px] text-muted-foreground/60">
+              <span className="mt-2 block text-xs text-muted-foreground/60">
                 {new Date(record.createdAt).toLocaleDateString()}
               </span>
             </div>
@@ -468,7 +468,7 @@ export function TradeHistory() {
                 placeholder="e.g. 45.50"
                 className="bg-background"
               />
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Clamped to 0–100; blur formats to 2 decimals.
               </p>
             </div>
@@ -486,7 +486,7 @@ export function TradeHistory() {
                 placeholder="e.g. 3"
                 className="bg-background"
               />
-              <p className="text-[10px] text-muted-foreground">Integer greater than 0.</p>
+              <p className="text-xs text-muted-foreground">Integer greater than 0.</p>
             </div>
           </div>
 

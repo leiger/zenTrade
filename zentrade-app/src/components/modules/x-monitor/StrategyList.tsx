@@ -83,13 +83,13 @@ export function StrategyList({ strategies, onToggle, onAdd, onEdit, onDelete }: 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium truncate">{s.name}</p>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 shrink-0">
                       {STRATEGY_TYPE_LABELS[s.strategyType]}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0 mt-0.5">
                     {Object.entries(s.params).map(([k, v]) => (
-                      <span key={k} className="text-[10px] text-muted-foreground">
+                      <span key={k} className="text-xs text-muted-foreground">
                         {k.replace(/_/g, ' ')}: {String(v)}
                       </span>
                     ))}

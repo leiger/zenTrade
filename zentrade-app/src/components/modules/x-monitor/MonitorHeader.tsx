@@ -24,6 +24,10 @@ interface MonitorHeaderProps {
   onRefresh: () => void;
   importing?: boolean;
   onImport?: () => void;
+  /** 量化引擎派生：今日发推数（Musk Quant 融合） */
+  todayCount?: number | null;
+  /** 量化引擎派生：预测落点（Musk Quant 融合） */
+  predictedLanding?: number | null;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -86,7 +90,7 @@ function useTimeSince(isoDate: string | null): string {
   return text;
 }
 
-export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onHistory, refreshing, onRefresh, importing, onImport }: MonitorHeaderProps) {
+export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, onHistory, refreshing, onRefresh, importing, onImport, todayCount, predictedLanding }: MonitorHeaderProps) {
   const [pastTrackings, setPastTrackings] = useState<TrackingPeriod[]>([]);
 
   useEffect(() => {
@@ -219,7 +223,7 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
                       className={`cursor-pointer ${selectedTrackingId === t.id ? 'bg-accent/50 font-medium' : ''}`}
                     >
                       <span className="truncate">{t.title}</span>
-                      <span className="ml-auto flex-shrink-0 text-muted-foreground text-[10px] pl-2">{formatEndDate(t.endDate)}</span>
+                      <span className="ml-auto flex-shrink-0 text-muted-foreground text-xs pl-2">{formatEndDate(t.endDate)}</span>
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -239,27 +243,45 @@ export function MonitorHeader({ status, selectedTrackingId, onTrackingChange, on
         <div className="flex items-center">
           <div className="inline-flex flex-wrap items-center gap-6 rounded-xl border border-border/50 bg-muted/20 px-6 py-3.5 shadow-sm">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">Posts</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Posts</span>
               <span className="text-lg font-bold tabular-nums text-foreground">{String(tracking?.totalPosts ?? status.currentPostCount)}</span>
             </div>
+            {todayCount != null && (
+              <>
+                <div className="h-5 w-[1px] bg-border/60" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Today</span>
+                  <span className="text-lg font-bold tabular-nums text-foreground">{todayCount}</span>
+                </div>
+              </>
+            )}
             <div className="h-5 w-[1px] bg-border/60" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">Since Last</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Since Last</span>
               <span className="text-lg font-bold tabular-nums text-foreground">{formatDuration(status.secondsSinceLastPost)}</span>
             </div>
             <div className="h-5 w-[1px] bg-border/60" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">Remaining</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Remaining</span>
               <span className="text-lg font-bold tabular-nums text-foreground">{formatDuration(remaining)}</span>
             </div>
             <div className="h-5 w-[1px] bg-border/60" />
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">Pace (Avg)</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Pace (Avg)</span>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-lg font-bold tabular-nums text-foreground">{tracking ? tracking.pace : '—'}</span>
-                {tracking && <span className="text-[11px] text-muted-foreground">({tracking.dailyAverage.toFixed(1)}/d)</span>}
+                {tracking && <span className="text-xs text-muted-foreground">({tracking.dailyAverage.toFixed(1)}/d)</span>}
               </div>
             </div>
+            {predictedLanding != null && (
+              <>
+                <div className="h-5 w-[1px] bg-border/60" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">Forecast</span>
+                  <span className="text-lg font-bold tabular-nums text-primary">~{predictedLanding}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

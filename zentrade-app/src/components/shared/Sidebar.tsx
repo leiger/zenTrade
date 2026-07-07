@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BrainCircuit, BarChart3, Inbox, LogOut, Wallet, Radio, ScanSearch, Crosshair } from 'lucide-react';
+import { BrainCircuit, BarChart3, Inbox, LogOut, Wallet, Radio, ScanSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ModeToggle } from '@/components/shared/ModeToggle';
 import { ThemeSwitcher } from '@/components/themes/theme-switcher';
@@ -27,7 +27,6 @@ const navigation = [
     label: 'Polymarket',
     items: [
       { name: 'X Monitor', href: '/x-monitor', icon: Radio, disabled: false },
-      { name: 'Musk Quant', href: '/musk-quant', icon: Crosshair, disabled: false },
       { name: 'Wallet Tracker', href: '/wallet-tracker', icon: ScanSearch, disabled: false },
     ],
   },
@@ -78,7 +77,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
           <div className="flex flex-col gap-0.5 leading-none">
             <span className="text-base font-semibold tracking-wide">ZenTrade</span>
-            <span className="text-[10px] text-muted-foreground">Cognitive trading</span>
+            <span className="text-xs text-muted-foreground">Cognitive trading</span>
           </div>
         </div>
       </SidebarHeader>
@@ -130,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuItem>
           </SidebarMenu>
           <div className="flex items-center justify-between w-full">
-            <span className="text-[10px] text-muted-foreground font-medium">ZenTrade v1.0</span>
+            <span className="text-xs text-muted-foreground font-medium">ZenTrade v1.0</span>
             <div className="flex items-center gap-0.5">
               <ThemeSwitcher />
               <ModeToggle />

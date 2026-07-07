@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, ChevronDown } from 'lucide-react';
+import { BookOpen, ChevronDown, TriangleAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -69,7 +69,7 @@ function Section({
     <div className="rounded-lg border border-border/60">
       <button
         onClick={() => onToggle(id)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-accent/40 transition-colors rounded-lg"
+        className="flex w-full items-center justify-between px-5 py-3.5 text-left text-base font-semibold hover:bg-accent/40 transition-colors rounded-lg"
       >
         {title}
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
@@ -94,8 +94,8 @@ export function StrategyGuide() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-xs text-muted-foreground">简化版 · 只讲操作，不讲数学 · 每期市场 7 天，以北京时间 24:00 结束</p>
-          <p className="mt-2 text-sm leading-relaxed">
+          <p className="text-sm text-muted-foreground">简化版 · 只讲操作，不讲数学 · 每期市场 7 天，以北京时间 24:00 结束</p>
+          <p className="mt-2 text-base leading-relaxed">
             核心思路：中心落点区间带来<strong>稳定基础收益</strong>，最佳盈亏比区间带来<strong>超额收益</strong>
             ，翼仓做保险按时减仓——<strong>规则写死，不靠临场判断。</strong>
           </p>
@@ -105,7 +105,7 @@ export function StrategyGuide() {
       <Section id="buy" title="§1 什么时候买、买多少" open={openSection === 'buy'} onToggle={toggle}>
         <div className="space-y-3">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60 text-left text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">时机</th>
@@ -126,13 +126,14 @@ export function StrategyGuide() {
               </tbody>
             </table>
           </div>
-          <div className="rounded-lg border border-teal-500/30 bg-teal-500/5 px-3 py-2.5 text-xs leading-relaxed">
+          <div className="rounded-lg border border-teal-500/30 bg-teal-500/5 px-4 py-3 text-sm leading-relaxed">
             <strong>超额收益策略</strong>：市场概览会自动找出当前市价远低于模型概率的区间（EV 指数 &gt; 1.25），即「价格被低估的区间」。
             此时中心仓位已有浮动盈利，可以用浮盈的 <strong>10–15%</strong> 买入最佳盈亏比区间，实现「中心保底 +
             翼仓超额」双层结构。注意：这是小仓位博弈，不是主力仓。若无明显价值区间（EV 指数 &lt; 1.25），跳过即可。
           </div>
-          <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2.5 text-xs leading-relaxed">
-            ⚠️ <strong>不建议这样做</strong>：距到期超过 3 天就重仓入场（预测不准，容易买错区间）；同一期内无限补仓（加仓应有明确计划，不是凭感觉）；把全部资金都押在超额收益机会上（它是辅助，不是主策略）。
+          <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm leading-relaxed">
+            <TriangleAlert className="mr-1.5 inline h-4 w-4 -translate-y-px text-red-500" />
+            <strong>不建议这样做</strong>：距到期超过 3 天就重仓入场（预测不准，容易买错区间）；同一期内无限补仓（加仓应有明确计划，不是凭感觉）；把全部资金都押在超额收益机会上（它是辅助，不是主策略）。
           </div>
         </div>
       </Section>
@@ -141,13 +142,13 @@ export function StrategyGuide() {
         <div className="space-y-3">
           <div className="space-y-1.5">
             {SELL_RULES.map((r) => (
-              <div key={r.time} className="flex items-start gap-3 rounded-md border border-border/40 px-3 py-2 text-xs">
+              <div key={r.time} className="flex items-start gap-3 rounded-md border border-border/40 px-3.5 py-2.5 text-sm">
                 <span className="w-44 shrink-0 font-medium">{r.time}</span>
                 <span className="text-muted-foreground leading-relaxed">{r.action}</span>
               </div>
             ))}
           </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs leading-relaxed">
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm leading-relaxed">
             <strong>卖出后它反而涨了，怎么办？</strong>
             这不是错误，这是正确的风险管理。预测市场的利润来自<strong>多次操作的平均收益</strong>
             ，不是某一次押对。翼仓归零的次数远多于中奖的次数。把卖出时间写成规则，不用在关键时刻临时决定，心理压力会小很多。
@@ -158,7 +159,7 @@ export function StrategyGuide() {
       <Section id="exception" title="§3 出现异常情况怎么办" open={openSection === 'exception'} onToggle={toggle}>
         <div className="space-y-1.5">
           {EXCEPTIONS.map((e) => (
-            <div key={e.title} className="rounded-md border border-border/40 px-3 py-2 text-xs">
+            <div key={e.title} className="rounded-md border border-border/40 px-3.5 py-2.5 text-sm">
               <p className="font-medium">{e.title}</p>
               <p className="mt-0.5 text-muted-foreground leading-relaxed">{e.action}</p>
             </div>
@@ -169,7 +170,7 @@ export function StrategyGuide() {
       <Section id="faq" title="§4 心理备忘（FAQ）" open={openSection === 'faq'} onToggle={toggle}>
         <div className="space-y-3">
           {FAQ.map((f) => (
-            <div key={f.q} className="text-xs">
+            <div key={f.q} className="text-sm">
               <p className="font-medium">Q：{f.q}</p>
               <p className="mt-1 text-muted-foreground leading-relaxed">A：{f.a}</p>
             </div>
@@ -180,19 +181,19 @@ export function StrategyGuide() {
       {/* 一张纸总结 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">一张纸总结（以北京时间 24:00 到期为基准）</CardTitle>
+          <CardTitle className="text-base">一张纸总结（以北京时间 24:00 到期为基准）</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-5">
             {TIMELINE.map((t) => (
               <div key={t.time} className="rounded-lg border border-border/50 px-3 py-2.5">
                 <div className={cn('h-1 w-8 rounded-full mb-2', t.tone)} />
-                <p className="text-[10px] text-muted-foreground leading-snug">{t.time}</p>
-                <p className="mt-1 text-xs font-semibold leading-snug">{t.action}</p>
+                <p className="text-sm text-muted-foreground leading-snug">{t.time}</p>
+                <p className="mt-1 text-sm font-semibold leading-snug">{t.action}</p>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[10px] text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground">
             中心区间是稳定收益来源 · 超额机会是锦上添花 · 翼仓按时减仓，不靠临场判断
           </p>
         </CardContent>

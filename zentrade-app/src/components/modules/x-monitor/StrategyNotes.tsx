@@ -148,7 +148,7 @@ export function StrategyNotes() {
               </p>
 
               {/* Date */}
-              <span className="mt-2 block text-[10px] text-muted-foreground/60">
+              <span className="mt-2 block text-xs text-muted-foreground/60">
                 {new Date(note.updatedAt).toLocaleDateString()}
               </span>
             </div>
