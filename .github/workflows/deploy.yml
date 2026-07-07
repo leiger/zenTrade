@@ -15,6 +15,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd ~/zenTrade
             git pull origin main
             docker compose --env-file .env.production up -d --build
