@@ -227,12 +227,17 @@ export function evaluateSessions(
 }
 
 export interface PredictionBundle extends LandingPrediction {
-  /** 线性 µ（概率模型用） */
+  /** 线性 µ */
   muLinear: number;
   /** 小时加权 µ */
   muHourly: number;
   /** 会话修正后的展示落点 */
   displayLanding: number;
+  /**
+   * 概率模型 λ = 会话修正后的落点（= displayLanding）。
+   * 展示落点与概率中心统一使用同一 µ，避免两者落在不同区间的自相矛盾。
+   */
+  lambdaMu: number;
   /** 预测精准度（置信 %） */
   confidence: number;
   sessions: SessionStatus[];
@@ -283,6 +288,7 @@ export function computePrediction(
     muLinear: M,
     muHourly: muH,
     displayLanding,
+    lambdaMu: displayLanding,
     confidence: confidenceCurve(remainingHours),
     sessions,
     totalMuAdjust,
@@ -340,6 +346,16 @@ export interface BucketProb extends BucketValuation {
   tweetsNeededMax: number;
   /** 时速难度 */
   difficulty: 'easy' | 'medium' | 'hard' | 'impossible' | null;
+  /** 买入可成交价（¢，ask 优先） */
+  askPct: number;
+  /** 卖出可成交价（¢，bid 优先） */
+  bidPct: number;
+  /** 点差（¢），bid/ask 缺失时为 null */
+  spreadPct: number | null;
+  /** 中间价口径 VR（对照展示用；决策一律用 vr = 模型概率 ÷ ask） */
+  vrMid: number;
+  /** 流动性不足：无盘口或点差 ≥5¢，薄尾玩法（彩票/高赔率仓）应跳过 */
+  illiquid: boolean;
 }
 
 function judge(vr: number): BucketValuation['judgement'] {
@@ -350,8 +366,22 @@ function judge(vr: number): BucketValuation['judgement'] {
   return 'overvalued';
 }
 
+/** 买入可成交价（¢）：优先 ask，缺盘口时回退中间价 */
+export function askPctOf(b: QuantBucket): number {
+  if (b.bestAsk !== null && b.bestAsk > 0) return Math.round(b.bestAsk * 1000) / 10;
+  return Math.round(b.price * 1000) / 10;
+}
+
+/** 卖出可成交价（¢）：优先 bid，缺盘口时回退中间价 */
+export function bidPctOf(b: QuantBucket): number {
+  if (b.bestBid !== null && b.bestBid > 0) return Math.round(b.bestBid * 1000) / 10;
+  return Math.round(b.price * 1000) / 10;
+}
+
 /**
- * 区间估值：泊松概率（仅 price≥1¢ 参与归一化）+ VR + 状态/时速。
+ * 区间估值：泊松概率（仅中间价 ≥1¢ 参与归一化）+ VR + 状态/时速。
+ * λ 用会话修正后的 µ（lambdaMu），与展示落点同源。
+ * VR 用买入可成交价（ask）：低价区间点差大，中间价 VR 会高估实际拿到的赔率。
  * @param buckets price 为 0-1 小数
  */
 export function evaluateBuckets(
@@ -361,7 +391,7 @@ export function evaluateBuckets(
   pace: number,
   remainingHours: number,
 ): BucketProb[] {
-  const M = prediction.muLinear;
+  const M = prediction.lambdaMu;
   const sigma = prediction.sigma;
   const k = Math.max(0.1, remainingHours);
   const v = pace / 24;
@@ -394,7 +424,14 @@ export function evaluateBuckets(
   return enriched.map((e): BucketProb => {
     const modelProb = totalRaw > 0 ? ((raw.get(e.bucket.marketId) ?? 0) / totalRaw) * 100 : 0;
     const normalProb = totalNormal > 0 ? ((rawNormal.get(e.bucket.marketId) ?? 0) / totalNormal) * 100 : 0;
-    const vr = e.pricePct > 0 ? modelProb / e.pricePct : 0;
+    const ask = askPctOf(e.bucket);
+    const bid = bidPctOf(e.bucket);
+    const spread =
+      e.bucket.bestAsk !== null && e.bucket.bestBid !== null
+        ? Math.round((e.bucket.bestAsk - e.bucket.bestBid) * 1000) / 10
+        : null;
+    const vrMid = e.pricePct > 0 ? modelProb / e.pricePct : 0;
+    const vr = ask > 0 ? modelProb / ask : 0;
     const status: BucketProb['status'] = current > e.max ? 'busted' : current >= e.min ? 'passed' : 'active';
     const minVelocity = Math.max(0, (e.min - current) / k);
     const maxVelocity = Math.max(0, (e.max - current) / k);
@@ -420,6 +457,11 @@ export function evaluateBuckets(
       tweetsNeededMin: Math.max(0, e.min - current),
       tweetsNeededMax: Math.max(0, e.max - current),
       difficulty,
+      askPct: ask,
+      bidPct: bid,
+      spreadPct: spread,
+      vrMid,
+      illiquid: spread === null || spread >= 5,
     };
   });
 }
@@ -453,8 +495,9 @@ export function buildEntryStructure(probs: BucketProb[]): EntryStructure {
   const highOdds =
     sorted.find(
       (p) =>
-        pricePct(p) <= 5 &&
+        p.askPct <= 5 &&
         p.vr >= 2 &&
+        !p.illiquid &&
         p !== main &&
         p !== protect,
     ) ?? null;
@@ -500,7 +543,7 @@ export function buildPhaseEntryPlan(
   if (e > 72 || e < 6) return null;
 
   const byMin = [...probs].sort((a, b) => a.bucket.min - b.bucket.min);
-  const M = prediction.muLinear;
+  const M = prediction.lambdaMu;
   // 中心区间：包含 M；否则取中点距 M 最近者
   let center = byMin.find((p) => p.isCenter) ?? null;
   if (!center && byMin.length > 0) {
@@ -532,25 +575,24 @@ export function buildPhaseEntryPlan(
     };
   }
 
-  // 最后 1.5 天：博弈高倍价差
+  // 最后 1.5 天：博弈高倍价差（可成交口径：买 NO 成本 ≈ 100 − YES bid，买 YES 成本 = ask）
   const noPlays = probs
     .filter((p) => {
-      const noPrice = 100 - pricePct(p);
+      const noPrice = 100 - p.bidPct;
       const distToTop = (p.bucket.max ?? 9999) - current;
-      return noPrice > 0 && noPrice <= 15 && distToTop >= 20 && distToTop <= 80;
+      return !p.illiquid && noPrice > 0 && noPrice <= 15 && distToTop >= 20 && distToTop <= 80;
     })
     .map((p) => {
-      const noPrice = 100 - pricePct(p);
+      const noPrice = 100 - p.bidPct;
       return { prob: p, noPrice, multiple: Math.round(100 / noPrice) };
     });
 
   const yesPlays = probs
     .filter((p) => {
-      const price = pricePct(p);
       const distToTop = (p.bucket.max ?? 9999) - current;
-      return price > 0 && price <= 15 && distToTop >= 0 && distToTop <= 15;
+      return !p.illiquid && p.askPct > 0 && p.askPct <= 15 && distToTop >= 0 && distToTop <= 15;
     })
-    .map((p) => ({ prob: p, multiple: Math.round(100 / pricePct(p)) }));
+    .map((p) => ({ prob: p, multiple: Math.round(100 / p.askPct) }));
 
   return {
     kind: 'endgame', title: '🔴 最后1.5天 · 博弈高倍价差',
@@ -566,7 +608,7 @@ export interface LotteryOpportunity {
   multiple: number;
 }
 
-/** 彩票仓：≤2¢、未进入、下限距 µ ≤60 条 */
+/** 彩票仓：ask ≤2¢、有盘口、未进入、下限距 µ ≤60 条 */
 export function findLotteryOpportunities(
   probs: BucketProb[],
   prediction: PredictionBundle,
@@ -574,14 +616,20 @@ export function findLotteryOpportunities(
 ): LotteryOpportunity[] {
   return probs
     .filter((p) => {
-      const price = pricePct(p);
-      const shootDist = p.bucket.min - prediction.muLinear;
-      return price > 0 && price <= 2 && p.bucket.min > current && shootDist >= 0 && shootDist <= 60;
+      const shootDist = p.bucket.min - prediction.lambdaMu;
+      return (
+        !p.illiquid &&
+        p.askPct > 0 &&
+        p.askPct <= 2 &&
+        p.bucket.min > current &&
+        shootDist >= 0 &&
+        shootDist <= 60
+      );
     })
     .map((p) => ({
       prob: p,
       needed: p.bucket.min - current,
-      multiple: Math.round(100 / pricePct(p)),
+      multiple: Math.round(100 / p.askPct),
     }));
 }
 
@@ -797,10 +845,10 @@ export function buildSignals(
   const signals: QuantAlertSignal[] = [];
   const remainingDays = remainingHours / 24;
   const center = probs.find((p) => p.isCenter) ?? null;
-  const mu = prediction.muLinear;
+  const mu = prediction.lambdaMu;
 
-  // 中心区间高估（负EV）
-  if (center && pricePct(center) > 35 && center.vr < 1) {
+  // 中心区间高估（负EV）：买入按 ask 计
+  if (center && center.askPct > 35 && center.vr < 1) {
     const alternatives = probs
       .filter((p) => p.modelProb >= 3 && p !== center)
       .sort((a, b) => b.vr - a.vr)
@@ -809,7 +857,7 @@ export function buildSignals(
       .join('、');
     signals.push({
       level: 'danger', title: '中心区间定价偏高，负EV',
-      detail: `预测正确 ≠ 下注正确：${center.bucket.label} 现价 ${pricePct(center).toFixed(1)}¢ 高于模型概率，买入是负EV操作。更划算的区间：${alternatives || '暂无'}。建议主仓移至价值比最高的相邻区间。`,
+      detail: `预测正确 ≠ 下注正确：${center.bucket.label} 买入价 ${center.askPct.toFixed(1)}¢ 高于模型概率，买入是负EV操作。更划算的区间：${alternatives || '暂无'}。建议主仓移至价值比最高的相邻区间。`,
     });
   }
 
@@ -845,33 +893,33 @@ export function buildSignals(
     }
   }
 
-  // 价值比机会
+  // 价值比机会（VR 按 ask 口径）
   const structure = buildEntryStructure(probs);
   const opp = probs.filter((p) => p.vr >= 1.2 && p.modelProb >= 3).sort((a, b) => b.vr - a.vr);
-  const centerOverpriced = center ? pricePct(center) > 35 && center.vr < 1 : false;
+  const centerOverpriced = center ? center.askPct > 35 && center.vr < 1 : false;
   if (opp.length > 0 && ((structure.main?.vr ?? 0) >= 1.5 || (centerOverpriced && (structure.main?.vr ?? 0) >= 1.2))) {
     const top = opp
       .slice(0, 4)
-      .map((p) => `${p.bucket.label} VR ${p.vr.toFixed(2)}（${pricePct(p).toFixed(1)}¢ / 模型 ${p.modelProb.toFixed(1)}%）`)
+      .map((p) => `${p.bucket.label} VR ${p.vr.toFixed(2)}（买入 ${p.askPct.toFixed(1)}¢ / 模型 ${p.modelProb.toFixed(1)}%）`)
       .join('；');
     signals.push({
       level: 'success', title: '价值比机会（入场结构建议）',
-      detail: `各区间价值比排名：${top}。只有 VR≥1.0 的区间才有正期望。${structure.verdictText}`,
+      detail: `各区间价值比排名（按可成交 ask 价计算）：${top}。只有 VR≥1.0 的区间才有正期望。${structure.verdictText}`,
     });
   }
 
-  // 止盈信号
+  // 止盈信号（卖出按 bid 计）
   if (center && remainingDays < 1.5) {
-    const cp = pricePct(center);
+    const cp = center.bidPct;
     if (cp >= 75) {
       signals.push({
         level: 'success', title: '止盈信号（高位）',
-        detail: `中心区间 ${center.bucket.label} 涨到 ${cp.toFixed(1)}¢：卖出 50% 锁利，剩余博到期 $1；>85¢ 时可大部分止盈。到这个价位赔率极低，减仓是理性的。`,
+        detail: `中心区间 ${center.bucket.label} 可卖价（bid）${cp.toFixed(1)}¢：卖出 50% 锁利，剩余博到期 $1；>85¢ 时可大部分止盈。到这个价位赔率极低，减仓是理性的。`,
       });
     } else if (cp >= 65) {
       signals.push({
         level: 'info', title: '可轻度止盈',
-        detail: `中心区间 ${center.bucket.label} 涨到 ${cp.toFixed(1)}¢，已进入可轻度止盈区间：建议减仓 20–30%，锁定部分收益，主仓继续持有等结算。`,
+        detail: `中心区间 ${center.bucket.label} 可卖价（bid）${cp.toFixed(1)}¢，已进入可轻度止盈区间：建议减仓 20–30%，锁定部分收益，主仓继续持有等结算。`,
       });
     }
   }
@@ -908,13 +956,13 @@ export interface PositionEvaluation {
   winValue: number;
 }
 
-/** 评估单笔持仓（价格 0-1） */
+/** 评估单笔持仓：估值与止盈/止损信号按可卖价（bid）计算 */
 export function evaluatePosition(
   position: QuantPosition,
   probs: BucketProb[],
 ): PositionEvaluation {
   const match = probs.find((p) => p.bucket.label === position.bucketLabel) ?? null;
-  const price = match ? match.bucket.price : null;
+  const price = match ? match.bidPct / 100 : null;
   const currentValue = price !== null ? position.shares * price : position.cost;
   const pnl = currentValue - position.cost;
   const pnlPct = position.cost > 0 ? (pnl / position.cost) * 100 : 0;
@@ -927,7 +975,7 @@ export function evaluatePosition(
       signalText = '止盈 ↑ 建议锁定部分利润';
     } else if (price <= position.entryPrice * 0.4) {
       signal = 'stoploss';
-      signalText = '减仓 ↓ 价格较均价跌幅 ≥60%，考虑止损';
+      signalText = '减仓 ↓ 可卖价较均价跌幅 ≥60%，考虑止损';
     } else if (match.modelProb < 3) {
       signal = 'modelexit';
       signalText = '出场：模型概率 <3%，区间已无胜算';

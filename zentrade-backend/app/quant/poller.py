@@ -130,12 +130,17 @@ class QuantPoller:
         pace = current / elapsed_days
         remaining_hours = max(0.0, (end - now).total_seconds() / 3600)
 
-        # 今日（BJ）已发：BJ 零点 = UTC 前一日 16:00
+        # 今日（BJ）各小时计数：BJ 零点 = UTC 前一日 16:00
         bj_midnight_utc = engine.bj_now(now).replace(hour=0, minute=0, second=0, microsecond=0) - engine.BJ_OFFSET
-        today_count = sum(
-            1 for p in posts
-            if p.get("createdAt") and datetime.fromisoformat(p["createdAt"].replace("Z", "+00:00")) >= bj_midnight_utc
-        )
+        today_by_hour = [0] * 24
+        for p in posts:
+            created = p.get("createdAt")
+            if not created:
+                continue
+            dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            if dt >= bj_midnight_utc:
+                today_by_hour[engine.bj_hour(dt)] += 1
+        today_count = sum(today_by_hour)
 
         buckets = clients.parse_event_buckets(event)
         candidates = engine.build_alerts(
@@ -146,6 +151,7 @@ class QuantPoller:
             remaining_hours=remaining_hours,
             event_slug=slug,
             now=now,
+            today_by_hour=today_by_hour,
         )
         if not candidates:
             return

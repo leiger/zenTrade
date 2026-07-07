@@ -4,7 +4,7 @@ import { Activity, AlertTriangle, Crosshair, Sparkles, Target, TrendingUp } from
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMuskQuantAnalysis } from '@/hooks/useMuskQuantAnalysis';
-import { pricePct, type BucketProb } from '@/lib/musk-quant-engine';
+import { type BucketProb } from '@/lib/musk-quant-engine';
 import type { QuantAlertSignal } from '@/types/musk-quant';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +22,7 @@ function vrColor(vr: number): string {
 }
 
 function BucketRow({ p, muDisplay }: { p: BucketProb; muDisplay: number }) {
-  const price = pricePct(p);
+  const price = p.askPct;
   const highlight = p.isCenter
     ? 'border-emerald-500/40 bg-emerald-500/5'
     : p.vr >= 1.5 && price <= 20
@@ -186,7 +186,7 @@ export function MarketOverview() {
                 区间定价（价格 / VR / 盈亏比）
               </span>
               <span className="text-[10px] font-normal text-muted-foreground">
-                VR = 模型概率 ÷ 盘口价，≥1.2 有价值
+                VR = 模型概率 ÷ 买入价（ask），≥1.2 有价值
               </span>
             </CardTitle>
           </CardHeader>
@@ -254,7 +254,7 @@ export function MarketOverview() {
                     <div key={prob.bucket.marketId} className="flex items-center justify-between text-xs">
                       <span className="font-medium tabular-nums">{prob.bucket.label}</span>
                       <span className="text-muted-foreground tabular-nums">
-                        YES {pricePct(prob).toFixed(1)}¢ · 最高 {multiple}x
+                        YES {prob.askPct.toFixed(1)}¢ · 最高 {multiple}x
                       </span>
                     </div>
                   ))}
@@ -282,7 +282,7 @@ export function MarketOverview() {
               >
                 <span className="font-medium tabular-nums">{prob.bucket.label}</span>
                 <span className="text-muted-foreground tabular-nums">
-                  还需 +{needed} 条 · {pricePct(prob).toFixed(1)}¢ · 最高 {multiple}x
+                  还需 +{needed} 条 · {prob.askPct.toFixed(1)}¢ · 最高 {multiple}x
                 </span>
               </div>
             ))}

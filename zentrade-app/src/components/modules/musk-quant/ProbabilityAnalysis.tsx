@@ -68,7 +68,7 @@ export function ProbabilityAnalysis() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">区间</TableHead>
-                  <TableHead className="text-right text-xs">盘口价</TableHead>
+                  <TableHead className="text-right text-xs">买入价</TableHead>
                   <TableHead className="text-right text-xs">模型概率</TableHead>
                   <TableHead className="text-right text-xs">VR</TableHead>
                   <TableHead className="text-right text-xs">状态</TableHead>
@@ -85,7 +85,12 @@ export function ProbabilityAnalysis() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right text-xs tabular-nums">{pricePct(p).toFixed(1)}¢</TableCell>
+                    <TableCell className="py-2 text-right text-xs tabular-nums">
+                      {p.askPct.toFixed(1)}¢
+                      {p.spreadPct !== null && p.spreadPct >= 5 && (
+                        <span className="ml-1 text-[9px] text-amber-500" title={`点差 ${p.spreadPct.toFixed(1)}¢`}>薄</span>
+                      )}
+                    </TableCell>
                     <TableCell className="py-2 text-right text-xs tabular-nums">{p.modelProb.toFixed(1)}%</TableCell>
                     <TableCell className="py-2 text-right text-xs">{vrCell(p.vr)}</TableCell>
                     <TableCell className="py-2 text-right text-[10px] text-muted-foreground">
@@ -96,8 +101,8 @@ export function ProbabilityAnalysis() {
               </TableBody>
             </Table>
             <p className="mt-2 text-[10px] text-muted-foreground">
-              VR = 模型概率 ÷ 盘口价，≥1.2 有价值 · 概率为泊松模型（λ = 线性 µ {prediction.muLinear.toFixed(1)}）在
-              ≥1¢ 区间内归一化
+              VR = 模型概率 ÷ 买入价（ask，可成交口径），≥1.2 有价值 · 概率为泊松模型（λ = 会话修正 µ{' '}
+              {prediction.lambdaMu.toFixed(0)}）在 ≥1¢ 区间内归一化 · 「薄」= 点差 ≥5¢，成交成本高
             </p>
           </CardContent>
         </Card>
@@ -177,7 +182,7 @@ export function ProbabilityAnalysis() {
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">⭐ 高赔率仓 ≤5%</p>
               <p className="mt-0.5 text-sm font-semibold tabular-nums">
                 {entryStructure.highOdds
-                  ? `${entryStructure.highOdds.bucket.label} · ${pricePct(entryStructure.highOdds).toFixed(1)}¢ · VR ${entryStructure.highOdds.vr.toFixed(2)}`
+                  ? `${entryStructure.highOdds.bucket.label} · ${entryStructure.highOdds.askPct.toFixed(1)}¢ · VR ${entryStructure.highOdds.vr.toFixed(2)}`
                   : '暂无（需 ≤5¢ 且 VR≥2）'}
               </p>
               <p className="text-[10px] text-muted-foreground">低价高赔率彩票位</p>

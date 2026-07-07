@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { useMuskQuantStore } from '@/lib/musk-quant-store';
 import { useMuskQuantAnalysis } from '@/hooks/useMuskQuantAnalysis';
-import { evaluatePosition, pricePct } from '@/lib/musk-quant-engine';
+import { evaluatePosition } from '@/lib/musk-quant-engine';
 import type { QuantPosition } from '@/types/musk-quant';
 import { cn } from '@/lib/utils';
 
@@ -70,9 +70,9 @@ export function PositionManager() {
 
   const handleBucketChange = (label: string) => {
     setBucketLabel(label);
-    // 选中区间自动填当前盘口价
+    // 选中区间自动填当前买入价（ask，即实际成交成本）
     const match = analysis.probs.find((p) => p.bucket.label === label);
-    if (match) setPriceInput(pricePct(match).toFixed(1));
+    if (match) setPriceInput(match.askPct.toFixed(1));
   };
 
   const handleAdd = () => {
@@ -115,7 +115,7 @@ export function PositionManager() {
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        ⚠️ 各区间互斥，最终只有一个区间结算为 YES。当前估值与浮盈均按市价折算，非中奖金额。
+        ⚠️ 各区间互斥，最终只有一个区间结算为 YES。当前估值与浮盈按可卖价（bid）折算，非中奖金额。
       </p>
 
       {/* 添加仓位 */}
@@ -140,7 +140,7 @@ export function PositionManager() {
                     .map((p) => (
                       <SelectItem key={p.bucket.marketId} value={p.bucket.label}>
                         {p.bucket.label}
-                        {p.isCenter ? ' ★中心' : ''} · {pricePct(p).toFixed(1)}¢
+                        {p.isCenter ? ' ★中心' : ''} · {p.askPct.toFixed(1)}¢
                       </SelectItem>
                     ))}
                 </SelectContent>

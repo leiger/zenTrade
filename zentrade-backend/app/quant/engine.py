@@ -13,6 +13,25 @@ from datetime import datetime, timedelta, timezone
 BJ_OFFSET = timedelta(hours=8)
 DEDUP_WINDOW_SECONDS = 6 * 3600
 
+# 206 天历史常量（与前端 musk-quant-engine.ts 一致）
+DAILY_BASELINE = 43.4
+
+HOURLY_FRACTION = [
+    0.0495, 0.05, 0.0512, 0.0503, 0.0415, 0.031,
+    0.0263, 0.0335, 0.035, 0.0295, 0.024, 0.0256,
+    0.028, 0.0699, 0.0785, 0.0616, 0.053, 0.027,
+    0.0183, 0.0223, 0.0347, 0.0467, 0.0603, 0.0522,
+]
+
+# (名称, BJ 小时窗口, 出现频率, 均值, 中位, 强阈值, 弱阈值, 期望贡献)
+SESSIONS = [
+    ("下午会话", [0, 1, 2, 3, 4, 5], 0.97, 14.4, 10, 15, 5, 13.9),
+    ("傍晚会话", [6, 7, 8, 9, 10], 0.51, 11.4, 6, 9, 3, 5.8),
+    ("深夜会话", [11, 12, 13, 14, 15, 16], 0.71, 14.3, 11, 16, 5, 10.1),
+    ("清晨过渡", [17, 18, 19], 0.16, 16.4, 13, 19, 6, 2.6),
+    ("上午会话", [20, 21, 22, 23], 0.64, 10.9, 8, 12, 4, 7.0),
+]
+
 
 @dataclass
 class BucketEval:
@@ -20,8 +39,10 @@ class BucketEval:
     lower: int
     upper: int | None
     price_pct: float          # bid/ask 中值（¢），缺失回退 last_trade
+    ask_pct: float            # 买入可成交价（¢），VR 用它
+    bid_pct: float            # 卖出可成交价（¢），止盈判断用它
     model_prob: float         # 泊松归一化概率 %
-    vr: float
+    vr: float                 # 模型概率 ÷ ask
     is_center: bool
 
 
@@ -65,6 +86,68 @@ def bj_date_key(now: datetime) -> str:
     return bj_now(now).strftime("%Y-%m-%d")
 
 
+# ── 落点 µ（与前端同源：小时加权 + 会话修正，统一 λ）────
+
+def mu_hourly(current: int, pace: float, remaining_hours: float, now: datetime) -> float:
+    bj = bj_now(now)
+    h, frac = bj.hour, (60 - bj.minute) / 60
+    r = HOURLY_FRACTION[h] * frac
+    for i in range(1, int(remaining_hours)):
+        r += HOURLY_FRACTION[(h + i) % 24]
+    return round((current + pace * r) * 10) / 10
+
+
+def session_mu_adjust(today_by_hour: list[int], pace: float, now: datetime) -> int:
+    """会话状态机的 µ 修正总量（前端 evaluateSessions 的移植，仅保留 muAdjust）。"""
+    bj_h = bj_hour(now)
+    scale = pace / DAILY_BASELINE if pace > 0 else 1.0
+    has_data = any(c > 0 for c in today_by_hour)
+    total = 0
+
+    for _name, hours, freq, avg, med, strong, weak, contrib in SESSIONS:
+        actual = sum(today_by_hour[h] for h in hours)
+        start_hour, end_hour = hours[0], hours[-1]
+
+        if bj_h < start_hour:
+            continue  # upcoming
+        if bj_h <= end_hour:
+            # 进行中
+            if not has_data or actual == 0:
+                continue  # pending
+            if actual >= strong:
+                total += round(avg * 0.3)
+            elif actual <= weak:
+                total -= round(avg * 0.25)
+            continue
+        # 已结束
+        if not has_data:
+            continue
+        if actual == 0:
+            if freq >= 0.6:
+                total -= round(contrib * scale)
+        elif actual >= strong:
+            total += round((actual - avg) * 0.5)
+        elif actual <= weak:
+            total -= round((med - actual) * 0.6)
+        else:
+            total += round((actual - avg) * 0.3)
+
+    return total
+
+
+def lambda_mu(
+    current: int,
+    pace: float,
+    remaining_hours: float,
+    today_by_hour: list[int],
+    now: datetime,
+) -> float:
+    """概率模型 λ：会话修正后的落点（与前端 displayLanding 同式）。"""
+    muh = mu_hourly(current, pace, remaining_hours, now)
+    adjusted = round(muh + session_mu_adjust(today_by_hour, pace, now))
+    return max(float(current), float(round((muh + adjusted) / 2)))
+
+
 # ── 区间估值 ──────────────────────────────────────────────
 
 def bucket_mid_pct(b: dict) -> float:
@@ -77,8 +160,24 @@ def bucket_mid_pct(b: dict) -> float:
     return 0.0
 
 
+def bucket_ask_pct(b: dict) -> float:
+    """买入可成交价（¢）：优先 ask，缺盘口回退中值。"""
+    ask = b.get("best_ask")
+    if isinstance(ask, (int, float)) and ask > 0:
+        return round(ask * 1000) / 10
+    return bucket_mid_pct(b)
+
+
+def bucket_bid_pct(b: dict) -> float:
+    """卖出可成交价（¢）：优先 bid，缺盘口回退中值。"""
+    bid = b.get("best_bid")
+    if isinstance(bid, (int, float)) and bid > 0:
+        return round(bid * 1000) / 10
+    return bucket_mid_pct(b)
+
+
 def evaluate_buckets(buckets: list[dict], mu: float) -> list[BucketEval]:
-    """泊松概率（仅 ≥1¢ 区间参与归一化）+ VR + 中心判定。"""
+    """泊松概率（仅中值 ≥1¢ 区间参与归一化）+ VR（ask 口径）+ 中心判定。"""
     enriched = []
     for b in buckets:
         upper = b.get("upper_bound")
@@ -87,6 +186,8 @@ def evaluate_buckets(buckets: list[dict], mu: float) -> list[BucketEval]:
             "lower": int(b.get("lower_bound", 0)),
             "upper": int(upper) if upper is not None else None,
             "price_pct": bucket_mid_pct(b),
+            "ask_pct": bucket_ask_pct(b),
+            "bid_pct": bucket_bid_pct(b),
         })
 
     eligible = [e for e in enriched if e["price_pct"] >= 1]
@@ -101,13 +202,15 @@ def evaluate_buckets(buckets: list[dict], mu: float) -> list[BucketEval]:
     out = []
     for e in enriched:
         model_prob = (raw.get(id(e), 0.0) / total * 100) if total > 0 else 0.0
-        vr = model_prob / e["price_pct"] if e["price_pct"] > 0 else 0.0
+        vr = model_prob / e["ask_pct"] if e["ask_pct"] > 0 else 0.0
         hi = e["upper"] if e["upper"] is not None else 9999
         out.append(BucketEval(
             label=e["label"],
             lower=e["lower"],
             upper=e["upper"],
             price_pct=e["price_pct"],
+            ask_pct=e["ask_pct"],
+            bid_pct=e["bid_pct"],
             model_prob=model_prob,
             vr=vr,
             is_center=e["lower"] <= mu <= hi,
@@ -149,15 +252,20 @@ def build_alerts(
     remaining_hours: float,
     event_slug: str,
     now: datetime,
+    today_by_hour: list[int] | None = None,
 ) -> list[AlertCandidate]:
     alerts: list[AlertCandidate] = []
     remaining_days = remaining_hours / 24
-    mu = current + (remaining_hours / 24) * pace
+    # λ 与前端展示落点同源（会话修正）；无小时数据时退化为线性外推
+    if today_by_hour is not None:
+        mu = lambda_mu(current, pace, remaining_hours, today_by_hour, now)
+    else:
+        mu = current + (remaining_hours / 24) * pace
     probs = evaluate_buckets(buckets, mu)
     center = next((p for p in probs if p.is_center), None)
 
     def fmt(p: BucketEval) -> str:
-        return f"{p.label}（VR {p.vr:.2f} / {p.price_pct:.1f}¢ / 模型 {p.model_prob:.1f}%）"
+        return f"{p.label}（VR {p.vr:.2f} / 买入 {p.ask_pct:.1f}¢ / 模型 {p.model_prob:.1f}%）"
 
     # 三层入场结构（用于阶段提醒与价值比机会正文）
     by_vr = sorted([p for p in probs if p.price_pct > 0 and p.model_prob > 0],
@@ -175,8 +283,8 @@ def build_alerts(
         pa.event_slug = event_slug
         alerts.append(pa)
 
-    # 2. 中心区间高估（负EV）
-    center_overpriced = bool(center and center.price_pct > 35 and center.vr < 1)
+    # 2. 中心区间高估（负EV）：买入按 ask 计
+    center_overpriced = bool(center and center.ask_pct > 35 and center.vr < 1)
     if center and center_overpriced:
         alternatives = "、".join(
             f"{p.label}（VR {p.vr:.2f}）"
@@ -184,9 +292,9 @@ def build_alerts(
                             key=lambda p: p.vr, reverse=True)[:3]
         )
         alerts.append(AlertCandidate(
-            key=f"center_overpriced_{center.label}_{math.floor(center.price_pct)}",
+            key=f"center_overpriced_{center.label}_{math.floor(center.ask_pct)}",
             level="danger", title="⚠️ 中心区间定价偏高，负EV",
-            detail=(f"预测正确 ≠ 下注正确：{center.label} 现价 {center.price_pct:.1f}¢ 高于模型概率，"
+            detail=(f"预测正确 ≠ 下注正确：{center.label} 买入价 {center.ask_pct:.1f}¢ 高于模型概率，"
                     f"买入是负EV操作。更划算的区间：{alternatives or '暂无'}。建议主仓移至价值比最高的相邻区间。"),
             event_slug=event_slug,
         ))
@@ -234,28 +342,28 @@ def build_alerts(
     if opp and (main_vr >= 1.5 or (center_overpriced and main_vr >= 1.2)):
         top = "；".join(fmt(p) for p in opp[:4])
         alerts.append(AlertCandidate(
-            key=f"vr_opp_{opp[0].label}_{math.floor(opp[0].price_pct)}",
+            key=f"vr_opp_{opp[0].label}_{math.floor(opp[0].ask_pct)}",
             level="success" if main_vr >= 1.5 else "info",
             title="💡 价值比机会（入场结构建议）",
             detail=f"各区间价值比排名：{top}。只有 VR≥1.0 的区间才有正期望。{verdict}",
             event_slug=event_slug,
         ))
 
-    # 7/8. 止盈信号（<1.5 天）
+    # 7/8. 止盈信号（<1.5 天，卖出按 bid 计）
     if center and remaining_days < 1.5:
-        if center.price_pct >= 75:
+        if center.bid_pct >= 75:
             alerts.append(AlertCandidate(
                 key=f"tp_high_{center.label}",
                 level="success", title="💰 止盈信号（高位）",
-                detail=(f"中心区间 {center.label} 涨到 {center.price_pct:.1f}¢：卖出 50% 锁利，"
+                detail=(f"中心区间 {center.label} 可卖价（bid）{center.bid_pct:.1f}¢：卖出 50% 锁利，"
                         f"剩余博到期 $1；>85¢ 时可大部分止盈。"),
                 event_slug=event_slug,
             ))
-        elif center.price_pct >= 65:
+        elif center.bid_pct >= 65:
             alerts.append(AlertCandidate(
                 key=f"tp_mid_{center.label}",
                 level="info", title="💰 可轻度止盈",
-                detail=f"中心区间 {center.label} 涨到 {center.price_pct:.1f}¢：建议减仓 20–30%，锁定部分收益。",
+                detail=f"中心区间 {center.label} 可卖价（bid）{center.bid_pct:.1f}¢：建议减仓 20–30%，锁定部分收益。",
                 event_slug=event_slug,
             ))
 
