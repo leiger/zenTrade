@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "zentrade-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:web"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "zentrade-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "zentrade-app", "start"],
+      "port": 3100,
+      "autoPort": true
+    }
+  ]
+}
