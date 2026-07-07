@@ -16,6 +16,7 @@ import {
   type PatternPrediction,
 } from '@/lib/musk-quant-morphology';
 import { pricePct, type BucketProb } from '@/lib/musk-quant-engine';
+import { logMorphologyVerdict } from '@/lib/musk-quant-api';
 import { cn } from '@/lib/utils';
 
 const GREEN = '#10b981';
@@ -65,12 +66,13 @@ interface ComparisonState {
 
 /** 单组对比：中心 vs 相邻区间 */
 function ComparisonSection({
-  title, center, comp, hoursLeft,
+  title, center, comp, hoursLeft, eventSlug,
 }: {
   title: string;
   center: BucketProb;
   comp: BucketProb | null;
   hoursLeft: number;
+  eventSlug: string;
 }) {
   const [state, setState] = useState<ComparisonState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,16 @@ function ComparisonSection({
           aligned.red = [comp!.bucket.price, comp!.bucket.price];
           aligned.timestamps = [Date.now() - 3600_000, Date.now()];
         }
-        setState({ aligned, prediction: predictPattern(aligned.green, aligned.red) });
+        const prediction = predictPattern(aligned.green, aligned.red);
+        setState({ aligned, prediction });
+        // 判定结果落库（每期每对比每日一条），事后对照实际走势验证分类器
+        logMorphologyVerdict({
+          eventSlug,
+          comparison: `${center.bucket.label} vs ${comp!.bucket.label}`,
+          pattern: prediction.pattern,
+          confidence: prediction.confidence,
+          hoursLeft,
+        });
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'load failed'))
       .finally(() => !cancelled && setLoading(false));
@@ -176,7 +187,7 @@ function ComparisonSection({
                 <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted/40">
                   <div className="h-full rounded-full" style={{ width: `${confPct}%`, background: tpl.color }} />
                 </div>
-                <span className="text-[11px] tabular-nums text-muted-foreground">{confPct}%</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">匹配 {confPct}%</span>
                 <span className="text-[11px] text-muted-foreground">{prediction.reason}</span>
                 {prediction.second && (
                   <span className="text-[10px] text-muted-foreground/70">
@@ -297,6 +308,12 @@ export function MorphologyCompare() {
         <span className="leading-relaxed">{relevance.text}</span>
       </div>
 
+      <p className="rounded-lg border border-border/50 bg-muted/20 px-4 py-2 text-[10px] leading-relaxed text-muted-foreground">
+        ⚠️ 形态分类为<strong>描述性参考</strong>：模板仅来自 18 个历史市场、权重人工调校，「匹配度」是特征打分（上限
+        92%），不是统计意义上的置信度。判定结果会自动记录，攒够样本对照实际结果后再评估其预测力——在那之前，请以
+        VR 与落点预测为主要决策依据。
+      </p>
+
       <div className="flex flex-wrap items-center gap-2">
         <GitCompareArrows className="h-4 w-4 text-primary" />
         {below && (
@@ -325,12 +342,14 @@ export function MorphologyCompare() {
         center={hottest}
         comp={below}
         hoursLeft={remainingHours}
+        eventSlug={analysis.event.slug}
       />
       <ComparisonSection
         title={`对比 B：中心 ${hottest.bucket.label} vs 上方 ${above?.bucket.label ?? '—'}`}
         center={hottest}
         comp={above}
         hoursLeft={remainingHours}
+        eventSlug={analysis.event.slug}
       />
 
       <Button variant="outline" size="sm" asChild>

@@ -42,6 +42,18 @@ CREATE TABLE IF NOT EXISTS quant_alerts (
     event_slug TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS quant_morphology_log (
+    id         TEXT PRIMARY KEY,
+    event_slug TEXT NOT NULL,
+    comparison TEXT NOT NULL,
+    bj_date    TEXT NOT NULL,
+    pattern    TEXT,
+    confidence REAL NOT NULL DEFAULT 0,
+    hours_left REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    UNIQUE(event_slug, comparison, bj_date)
+);
 """
 
 
@@ -215,6 +227,48 @@ async def list_alerts(db: aiosqlite.Connection, limit: int = 50, offset: int = 0
     return [
         {"id": r["id"], "key": r["key"], "level": r["level"], "title": r["title"],
          "detail": r["detail"], "eventSlug": r["event_slug"], "createdAt": r["created_at"]}
+        for r in rows
+    ]
+
+
+# ── Morphology Verdict Log（每期每对比每 BJ 日一条，事后对照实际结果验证分类器）──
+
+async def upsert_morphology_log(
+    db: aiosqlite.Connection,
+    event_slug: str,
+    comparison: str,
+    bj_date: str,
+    pattern: str | None,
+    confidence: float,
+    hours_left: float,
+) -> None:
+    import uuid
+
+    await db.execute(
+        """INSERT INTO quant_morphology_log
+        (id, event_slug, comparison, bj_date, pattern, confidence, hours_left, created_at)
+        VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(event_slug, comparison, bj_date) DO UPDATE SET
+            pattern=excluded.pattern,
+            confidence=excluded.confidence,
+            hours_left=excluded.hours_left,
+            created_at=excluded.created_at""",
+        (str(uuid.uuid4()), event_slug, comparison, bj_date, pattern,
+         confidence, hours_left, _now_iso()),
+    )
+    await db.commit()
+
+
+async def list_morphology_log(db: aiosqlite.Connection, limit: int = 200) -> list[dict]:
+    rows = await fetchall(
+        db,
+        "SELECT * FROM quant_morphology_log ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    )
+    return [
+        {"eventSlug": r["event_slug"], "comparison": r["comparison"], "bjDate": r["bj_date"],
+         "pattern": r["pattern"], "confidence": r["confidence"], "hoursLeft": r["hours_left"],
+         "createdAt": r["created_at"]}
         for r in rows
     ]
 

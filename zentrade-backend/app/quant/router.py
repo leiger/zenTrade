@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.quant import clients
@@ -16,7 +17,9 @@ from app.quant.database import (
     get_hourly_counts,
     get_price_snapshots,
     list_alerts,
+    list_morphology_log,
     list_snapshot_slugs,
+    upsert_morphology_log,
 )
 from app.quant.poller import poller
 
@@ -126,6 +129,45 @@ async def quant_remaining_samples(remainingHours: float = Query(..., ge=0, le=20
         "daysUsed": len(poller._day_vectors),
         "samples": samples,
     }
+
+
+class MorphologyLogBody(BaseModel):
+    eventSlug: str = Field(min_length=1)
+    comparison: str = Field(min_length=1)
+    pattern: str | None = None
+    confidence: float = 0
+    hoursLeft: float = 0
+
+
+@router.post("/morphology-log", status_code=204)
+async def quant_morphology_log(body: MorphologyLogBody):
+    """记录形态判定（每期每对比每 BJ 日一条），事后对照实际走势验证分类器。"""
+    from datetime import datetime, timezone
+
+    from app.quant.engine import bj_date_key
+
+    db = await get_db()
+    try:
+        await upsert_morphology_log(
+            db,
+            event_slug=body.eventSlug,
+            comparison=body.comparison,
+            bj_date=bj_date_key(datetime.now(timezone.utc)),
+            pattern=body.pattern,
+            confidence=body.confidence,
+            hours_left=body.hoursLeft,
+        )
+    finally:
+        await db.close()
+
+
+@router.get("/morphology-log")
+async def quant_morphology_log_list(limit: int = Query(200, ge=1, le=1000)):
+    db = await get_db()
+    try:
+        return await list_morphology_log(db, limit=limit)
+    finally:
+        await db.close()
 
 
 @router.get("/hourly-counts")

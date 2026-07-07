@@ -185,6 +185,24 @@ export async function fetchRemainingSamples(remainingHours: number): Promise<num
   }
 }
 
+/** 上报形态判定（fire-and-forget，用于事后验证分类器准确率） */
+export function logMorphologyVerdict(v: {
+  eventSlug: string;
+  comparison: string;
+  pattern: string | null;
+  confidence: number;
+  hoursLeft: number;
+}): void {
+  void fetch(`${BACKEND_BASE}/quant/morphology-log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(v),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => {
+    // 记录失败不影响使用
+  });
+}
+
 interface XtrackerPostRaw {
   id: string;
   platformId: string;
